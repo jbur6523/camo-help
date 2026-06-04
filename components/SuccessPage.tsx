@@ -7,7 +7,7 @@ export function SuccessPage({
   athletePdfUrl: string;
   nationalPdfUrl: string;
 }) {
-  const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL || "";
+  const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL || "https://camo-mma.myshopify.com/account/login";
   return (
     <main className="app-shell">
       <section className="wizard-body">
