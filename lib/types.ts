@@ -168,7 +168,14 @@ export function calculateAge(mmddyyyy: string) {
   const day = Number(match[2]);
   const year = Number(match[3]);
   const birth = new Date(year, month, day);
-  if (Number.isNaN(birth.getTime())) return "";
+  if (
+    Number.isNaN(birth.getTime()) ||
+    birth.getFullYear() !== year ||
+    birth.getMonth() !== month ||
+    birth.getDate() !== day
+  ) {
+    return "";
+  }
   const today = new Date();
   let age = today.getFullYear() - birth.getFullYear();
   const hasBirthdayPassed =
@@ -176,6 +183,13 @@ export function calculateAge(mmddyyyy: string) {
     (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
   if (!hasBirthdayPassed) age -= 1;
   return age >= 0 && age < 120 ? String(age) : "";
+}
+
+export function formatBirthDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
 export function fullName(data: Pick<ApplicationData, "firstName" | "middleName" | "lastName">) {

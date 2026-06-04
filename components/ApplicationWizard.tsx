@@ -18,6 +18,7 @@ import {
   defaultApplicationData,
   fightRecordTotal,
   fullName,
+  formatBirthDateInput,
   type ApplicationData,
   type UploadKey,
   type UploadedFiles
@@ -89,7 +90,12 @@ export function ApplicationWizard() {
   }, [watch]);
 
   useEffect(() => {
-    const age = calculateAge(data.birthDate);
+    const formattedBirthDate = formatBirthDateInput(data.birthDate);
+    if (formattedBirthDate && formattedBirthDate !== data.birthDate) {
+      setValue("birthDate", formattedBirthDate, { shouldValidate: true, shouldDirty: true });
+      return;
+    }
+    const age = calculateAge(formattedBirthDate);
     if (age && age !== data.age) {
       setValue("age", age, { shouldValidate: true, shouldDirty: true });
     }
@@ -155,7 +161,7 @@ export function ApplicationWizard() {
         </div>
       </header>
 
-      <form className="wizard-body" onSubmit={(event) => event.preventDefault()}>
+      <form className="wizard-body" onFocusCapture={scrollFocusedFieldIntoView} onSubmit={(event) => event.preventDefault()}>
         {globalError ? <div className="notice" style={{ marginBottom: 16 }}><strong>Check this:</strong> {globalError}</div> : null}
         {step === 0 ? <StepApplicantInfo form={form} /> : null}
         {step === 1 ? <StepApplicationType form={form} /> : null}
@@ -253,7 +259,8 @@ export function ApplicationWizard() {
     }
 
     if (currentStep === 0) {
-      if (!calculateAge(values.birthDate)) return fail("Enter birth date as MM/DD/YYYY.");
+      if (!calculateAge(values.birthDate)) return fail("Enter a real birth date as MM/DD/YYYY.");
+      if (!isValidAge(values.age)) return fail("Enter a valid age.");
       if (!/^\S+@\S+\.\S+$/.test(values.email)) return fail("Enter a valid email address.");
       if (/p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
       if (!/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
@@ -438,4 +445,20 @@ function hasMissing(entries: Array<Record<string, unknown>>) {
 
 function toArrayBuffer(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function isValidAge(age: string) {
+  const value = Number(age);
+  return Number.isInteger(value) && value >= 0 && value < 120;
+}
+
+function scrollFocusedFieldIntoView(event: React.FocusEvent<HTMLFormElement>) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+    return;
+  }
+
+  window.setTimeout(() => {
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, 260);
 }

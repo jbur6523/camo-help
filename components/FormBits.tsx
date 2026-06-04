@@ -15,7 +15,9 @@ export function Field({
   placeholder,
   helper,
   inputMode,
-  readOnly = false
+  readOnly = false,
+  maxLength,
+  onChange
 }: {
   label: string;
   name: Name;
@@ -27,6 +29,8 @@ export function Field({
   helper?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   readOnly?: boolean;
+  maxLength?: number;
+  onChange?: React.ChangeEventHandler<HTMLInputElement>;
 }) {
   const message = getError(errors, name);
   return (
@@ -38,8 +42,10 @@ export function Field({
         placeholder={placeholder}
         inputMode={inputMode}
         readOnly={readOnly}
+        maxLength={maxLength}
         {...register(name as never, {
-          required: required ? (typeof required === "string" ? required : `${label} is required.`) : false
+          required: required ? (typeof required === "string" ? required : `${label} is required.`) : false,
+          onChange
         })}
       />
       {helper ? <small>{helper}</small> : null}

@@ -20,6 +20,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
+  scroll-padding-bottom: 180px;
 }
 
 button,
@@ -135,7 +136,7 @@ textarea {
 }
 
 .wizard-body {
-  padding: 20px 16px 112px;
+  padding: 20px 16px 180px;
 }
 
 .step-title {
@@ -179,6 +180,8 @@ textarea {
   padding: 12px;
   background: var(--field);
   color: var(--ink);
+  scroll-margin-bottom: 180px;
+  scroll-margin-top: 96px;
 }
 
 .field textarea {
@@ -318,10 +321,26 @@ textarea {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 10px;
-  padding: 12px 16px 16px;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(12px);
+}
+
+@media (max-width: 699px) {
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .wizard-body {
+    padding-bottom: max(220px, calc(180px + env(safe-area-inset-bottom)));
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    scroll-margin-bottom: 240px;
+  }
 }
 
 .button {

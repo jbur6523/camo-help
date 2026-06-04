@@ -2,10 +2,10 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import { Field, SelectField } from "@/components/FormBits";
-import type { ApplicationData } from "@/lib/types";
+import { calculateAge, formatBirthDateInput, type ApplicationData } from "@/lib/types";
 
 export function StepApplicantInfo({ form }: { form: UseFormReturn<ApplicationData> }) {
-  const { register, formState } = form;
+  const { register, formState, setValue } = form;
   return (
     <>
       <h2 className="step-title">Applicant Info</h2>
@@ -22,9 +22,18 @@ export function StepApplicantInfo({ form }: { form: UseFormReturn<ApplicationDat
           required
           placeholder="MM/DD/YYYY"
           inputMode="numeric"
+          maxLength={10}
+          onChange={(event) => {
+            const birthDate = formatBirthDateInput(event.currentTarget.value);
+            const age = calculateAge(birthDate);
+            setValue("birthDate", birthDate, { shouldDirty: true, shouldValidate: true });
+            if (age) {
+              setValue("age", age, { shouldDirty: true, shouldValidate: true });
+            }
+          }}
         />
         <div className="field-grid two-col">
-          <Field label="Age" name="age" register={register} errors={formState.errors} required inputMode="numeric" readOnly />
+          <Field label="Age" name="age" register={register} errors={formState.errors} required inputMode="numeric" />
           <SelectField label="Sex" name="sex" register={register} errors={formState.errors} required>
             <option value="">Select</option>
             <option value="Male">Male</option>
