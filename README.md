@@ -23,29 +23,35 @@ npm run build
 
 The source templates live in:
 
-- `public/templates/Camo Athlete License(1).pdf`
-- `public/templates/National ID form(1).pdf`
+- `public/templates/Camo Athlete License - Fillable.pdf`
+- `public/templates/National ID form 0 Fillable.pdf`
 
-Both current templates were inspected with:
+Both templates contain AcroForm fields and are inspected with:
 
 ```bash
 npm run inspect:pdfs
 ```
 
-They do not contain fillable PDF fields, so this version uses coordinate overlays with `pdf-lib`.
+The app fills the forms by exact field name with `pdf-lib`, checks checkbox fields, updates field appearances, embeds a drawn signature image if one is available, and then flattens the completed PDFs before download or email. The older coordinate overlay mapping remains in the repo as an emergency fallback only.
 
 ## Adjust PDF Field Mappings
 
-Mappings live in `lib/pdf/pdfFieldMap.ts`.
+Primary field-name mappings live in `lib/pdf/pdfFieldNameMap.ts`.
 
-`pdf-lib` coordinates start at the bottom-left of the page:
+Run `npm run inspect:pdfs` any time the fillable templates are replaced. If a field name in the new PDF differs from the mapping, update the corresponding entry in `lib/pdf/pdfFieldNameMap.ts` to match the exact inspected field name.
+
+For missing fields, the safe fill helper in `lib/pdf/fillAcroForm.ts` logs a development warning instead of crashing PDF generation. Coordinate overlays in `lib/pdf/pdfFieldMap.ts` and `lib/pdf/generatePdf.ts` can still be used for an emergency fallback. `pdf-lib` coordinates start at the bottom-left of the page:
 
 - Increase `x` to move text right.
 - Increase `y` to move text up.
 - Reduce `size` if text is too large.
 - Add `maxWidth` for wrapped text blocks.
 
-Run `npm run inspect:pdfs` to confirm page sizes and fillable field names after replacing a template. If a future PDF has AcroForm fields, add the exact names under `fillableFields`.
+## Continuation Sheets
+
+The athlete license form has limited official fields for fight history and disclosure entries. When the applicant has more rows than fit, or an entry is too long for the official field area, `lib/pdf/generateContinuationSheets.ts` creates letter-size continuation pages with applicant name, DOB, section headings, and table-style rows.
+
+Continuation pages are appended to the completed Athlete License PDF so the application email still contains one completed athlete-license attachment.
 
 ## Email Configuration
 

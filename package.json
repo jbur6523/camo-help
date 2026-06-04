@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "inspect:pdfs": "tsx scripts/inspect-pdfs.ts",
+    "inspect:pdfs": "tsx scripts/inspect-pdf-fields.ts",
     "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },
   "dependencies": {

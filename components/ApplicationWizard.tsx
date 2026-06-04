@@ -13,7 +13,7 @@ import { SuccessPage } from "@/components/SuccessPage";
 import { WizardBottomNav } from "@/components/WizardBottomNav";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
-import { athleteLicenseFieldMap, nationalIdFieldMap } from "@/lib/pdf/pdfFieldMap";
+import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
 import {
   calculateAge,
   defaultApplicationData,
@@ -339,8 +339,8 @@ export function ApplicationWizard() {
     setGlobalError("");
     try {
       const [athleteTemplate, nationalTemplate] = await Promise.all([
-        fetch(athleteLicenseFieldMap.templatePath).then((response) => response.arrayBuffer()),
-        fetch(nationalIdFieldMap.templatePath).then((response) => response.arrayBuffer())
+        fetch(athleteLicenseTemplatePath).then((response) => response.arrayBuffer()),
+        fetch(nationalIdTemplatePath).then((response) => response.arrayBuffer())
       ]);
       const values = form.getValues();
       const [athleteBytes, nationalBytes] = await Promise.all([
