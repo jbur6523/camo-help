@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { StepRequirementsNeeded } from "@/components/StepRequirementsNeeded";
 import { StepApplicantInfo } from "@/components/StepApplicantInfo";
 import { StepApplicationType } from "@/components/StepApplicationType";
 import { StepFighterHistory } from "@/components/StepFighterHistory";
@@ -28,6 +29,7 @@ import {
 const storageKey = "camo-help-application-v1";
 
 const steps = [
+  "Requirements Needed",
   "Applicant Info",
   "Application Type",
   "Fighter History",
@@ -164,16 +166,17 @@ export function ApplicationWizard() {
 
       <form className="wizard-body" onFocusCapture={scrollFocusedFieldIntoView} onSubmit={(event) => event.preventDefault()}>
         {globalError ? <div className="notice" style={{ marginBottom: 16 }}><strong>Check this:</strong> {globalError}</div> : null}
-        {step === 0 ? <StepApplicantInfo form={form} /> : null}
-        {step === 1 ? <StepApplicationType form={form} /> : null}
-        {step === 2 ? <StepFighterHistory form={form} /> : null}
-        {step === 3 ? <StepCommissionHistory form={form} /> : null}
-        {step === 4 ? <StepLegalQuestions form={form} /> : null}
-        {step === 5 ? (
+        {step === 0 ? <StepRequirementsNeeded form={form} /> : null}
+        {step === 1 ? <StepApplicantInfo form={form} /> : null}
+        {step === 2 ? <StepApplicationType form={form} /> : null}
+        {step === 3 ? <StepFighterHistory form={form} /> : null}
+        {step === 4 ? <StepCommissionHistory form={form} /> : null}
+        {step === 5 ? <StepLegalQuestions form={form} /> : null}
+        {step === 6 ? (
           <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} />
         ) : null}
-        {step === 6 ? <StepReview form={form} uploadFiles={uploadFiles} onEdit={setStep} /> : null}
-        {step === 7 ? (
+        {step === 7 ? <StepReview form={form} uploadFiles={uploadFiles} onEdit={setStep} /> : null}
+        {step === 8 ? (
           <GenerateStep
             pdfs={pdfs}
             isBusy={isBusy}
@@ -231,6 +234,8 @@ export function ApplicationWizard() {
     const values = form.getValues();
     const requireFields: Array<keyof ApplicationData> =
       currentStep === 0
+        ? ["requirementsNeeded"]
+        : currentStep === 1
         ? [
             "firstName",
             "lastName",
@@ -249,9 +254,9 @@ export function ApplicationWizard() {
             "heightInches",
             "weight"
           ]
-        : currentStep === 1
+        : currentStep === 2
           ? ["athleteLicenseType", "nationalIdType"]
-          : currentStep === 6
+          : currentStep === 7
             ? [
                 "certifyTrue",
                 "certifyConsequences",
@@ -268,6 +273,10 @@ export function ApplicationWizard() {
     }
 
     if (currentStep === 0) {
+      if (!(values.requirementsNeeded || []).length) return fail("Select at least one item to submit now.");
+    }
+
+    if (currentStep === 1) {
       if (!calculateAge(values.birthDate)) return fail("Enter a real birth date as MM/DD/YYYY.");
       if (!isValidAge(values.age)) return fail("Enter a valid age.");
       if (!/^\S+@\S+\.\S+$/.test(values.email)) return fail("Enter a valid email address.");
@@ -275,7 +284,7 @@ export function ApplicationWizard() {
       if (!/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
     }
 
-    if (currentStep === 2) {
+    if (currentStep === 3) {
       if (values.otherNames === "yes" && !values.otherNamesList.trim()) return fail("List the other name(s) used.");
       if (values.disqualified === "yes" && !values.disqualifiedExplanation.trim()) return fail("Explain the disqualification.");
       if (values.medicalLicenseIssue === "yes" && !values.medicalLicenseExplanation.trim()) return fail("Explain the medical license issue.");
@@ -298,7 +307,7 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 4) {
       if (values.licensedBefore === "yes" && (!values.priorLicenses.length || hasMissing(values.priorLicenses))) {
         return fail("Add complete prior license entries.");
       }
@@ -310,7 +319,7 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       if (values.convictedCrime === "yes" && (!values.convictions.length || hasMissing(values.convictions))) {
         return fail("Add complete conviction entries.");
       }
@@ -319,7 +328,7 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 5) {
+    if (currentStep === 6) {
       const requiredUploads: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId"];
       const missing = requiredUploads.filter((key) => !(uploadFiles[key] || []).length);
       if (missing.length) return fail(`Missing required upload: ${missing.join(", ")}.`);
@@ -370,8 +379,8 @@ export function ApplicationWizard() {
   }
 
   async function submitDocuments() {
-    if (!(await validateStep(6))) {
-      setStep(6);
+    if (!(await validateStep(7))) {
+      setStep(7);
       return;
     }
 

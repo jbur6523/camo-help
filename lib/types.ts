@@ -10,6 +10,14 @@ export type UploadKey =
 
 export type UploadedFiles = Partial<Record<UploadKey, File[]>>;
 
+export type RequirementKey =
+  | "athleteLicenseApplication"
+  | "nationalMmaIdApplication"
+  | "bloodwork"
+  | "physical"
+  | "headshot"
+  | "photoId";
+
 export type FightEvent = {
   promoter: string;
   state: string;
@@ -70,6 +78,7 @@ export type ApplicationData = {
   heightFeet: string;
   heightInches: string;
   weight: string;
+  requirementsNeeded: RequirementKey[];
   athleteLicenseType: "" | "Original" | "Renewal";
   nationalIdType: "" | "Original" | "Renewal" | "Replacement";
   otherNames: YesNo;
@@ -111,6 +120,17 @@ export const uploadLabels: Record<UploadKey, string> = {
   additional: "Additional document"
 };
 
+export const requirementLabels: Record<RequirementKey, string> = {
+  athleteLicenseApplication: "Athlete License Application",
+  nationalMmaIdApplication: "National MMA ID Application",
+  bloodwork: "Blood Work",
+  physical: "Physical",
+  headshot: "Headshot Photo",
+  photoId: "Driver's License / State ID"
+};
+
+export const defaultRequirementsNeeded = Object.keys(requirementLabels) as RequirementKey[];
+
 export const defaultApplicationData: ApplicationData = {
   firstName: "",
   middleName: "",
@@ -129,6 +149,7 @@ export const defaultApplicationData: ApplicationData = {
   heightFeet: "",
   heightInches: "",
   weight: "",
+  requirementsNeeded: [...defaultRequirementsNeeded],
   athleteLicenseType: "Original",
   nationalIdType: "Original",
   otherNames: "no",

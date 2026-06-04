@@ -3,7 +3,7 @@
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
-import { fullName, uploadLabels } from "@/lib/types";
+import { defaultRequirementsNeeded, fullName, requirementLabels, uploadLabels } from "@/lib/types";
 
 export function StepReview({
   form,
@@ -16,12 +16,23 @@ export function StepReview({
 }) {
   const { register, watch, formState } = form;
   const data = watch();
+  const requirementsNeeded = data.requirementsNeeded || defaultRequirementsNeeded;
+  const submittingNow = defaultRequirementsNeeded.filter((key) => requirementsNeeded.includes(key));
+  const alreadyCompleted = defaultRequirementsNeeded.filter((key) => !requirementsNeeded.includes(key));
   return (
     <>
       <h2 className="step-title">Review</h2>
       <p className="step-help">Check everything before the app generates PDFs and sends documents.</p>
       <div className="field-grid">
-        <ReviewBlock title="Applicant info" onEdit={() => onEdit(0)}>
+        <ReviewBlock title="Requirements needed" onEdit={() => onEdit(0)}>
+          <ReviewLine label="Submitting now" value={submittingNow.map((key) => requirementLabels[key]).join(", ")} />
+          <ReviewLine
+            label="Marked already completed"
+            value={alreadyCompleted.map((key) => requirementLabels[key]).join(", ") || "None"}
+          />
+        </ReviewBlock>
+
+        <ReviewBlock title="Applicant info" onEdit={() => onEdit(1)}>
           <ReviewLine label="Name" value={fullName(data)} />
           <ReviewLine label="Birth date" value={`${data.birthDate} (${data.age || "age unknown"})`} />
           <ReviewLine label="Contact" value={`${data.email} / ${data.phone}`} />
@@ -29,12 +40,12 @@ export function StepReview({
           <ReviewLine label="Height / weight" value={`${data.heightFeet}' ${data.heightInches}" / ${data.weight} lbs`} />
         </ReviewBlock>
 
-        <ReviewBlock title="Application types" onEdit={() => onEdit(1)}>
+        <ReviewBlock title="Application types" onEdit={() => onEdit(2)}>
           <ReviewLine label="Athlete License" value={data.athleteLicenseType} />
           <ReviewLine label="National MMA ID" value={data.nationalIdType} />
         </ReviewBlock>
 
-        <ReviewBlock title="History" onEdit={() => onEdit(2)}>
+        <ReviewBlock title="History" onEdit={() => onEdit(3)}>
           <ReviewLine label="Other names" value={data.otherNames === "yes" ? data.otherNamesList : "No"} />
           <ReviewLine label="Disqualified" value={data.disqualified === "yes" ? data.disqualifiedExplanation : "No"} />
           <ReviewLine label="Medical license issue" value={data.medicalLicenseIssue === "yes" ? data.medicalLicenseExplanation : "No"} />
@@ -45,7 +56,7 @@ export function StepReview({
           <ReviewLine label="Listed fights" value={String(data.fights.length)} />
         </ReviewBlock>
 
-        <ReviewBlock title="Commission history" onEdit={() => onEdit(3)}>
+        <ReviewBlock title="Commission history" onEdit={() => onEdit(4)}>
           <ReviewLine label="Prior licenses" value={data.licensedBefore === "yes" ? String(data.priorLicenses.length) : "No"} />
           <ReviewLine label="Discipline" value={data.commissionDiscipline === "yes" ? String(data.commissionActions.length) : "No"} />
           <ReviewLine
@@ -54,12 +65,12 @@ export function StepReview({
           />
         </ReviewBlock>
 
-        <ReviewBlock title="Criminal / legal" onEdit={() => onEdit(4)}>
+        <ReviewBlock title="Criminal / legal" onEdit={() => onEdit(5)}>
           <ReviewLine label="Convictions" value={data.convictedCrime === "yes" ? String(data.convictions.length) : "No"} />
           <ReviewLine label="Pending charges" value={data.pendingLawCharges === "yes" ? String(data.pendingLawChargesList.length) : "No"} />
         </ReviewBlock>
 
-        <ReviewBlock title="Uploaded files" onEdit={() => onEdit(5)}>
+        <ReviewBlock title="Uploaded files" onEdit={() => onEdit(6)}>
           {(Object.keys(uploadLabels) as Array<keyof typeof uploadLabels>).map((key) => (
             <ReviewLine
               key={key}
