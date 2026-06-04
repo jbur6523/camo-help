@@ -12,7 +12,7 @@ export type SubmissionEmailPayload = {
   application: ApplicationData;
   athletePdf: EmailAttachment;
   nationalIdPdf: EmailAttachment;
-  uploads: Partial<Record<UploadKey, EmailAttachment>>;
+  uploads: Partial<Record<UploadKey, EmailAttachment[]>>;
 };
 
 export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
@@ -48,9 +48,9 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     attachments: [
       payload.athletePdf,
       payload.nationalIdPdf,
-      payload.uploads.headshot,
-      payload.uploads.photoId
-    ].filter(Boolean) as EmailAttachment[]
+      ...(payload.uploads.headshot || []),
+      ...(payload.uploads.photoId || [])
+    ]
   });
 
   await transporter.sendMail({
@@ -59,20 +59,20 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     subject: `CAMO Medical Documents - ${name}`,
     text: summary,
     attachments: [
-      payload.uploads.bloodwork,
-      payload.uploads.physical,
-      payload.uploads.cardio,
-      payload.uploads.additional
-    ].filter(Boolean) as EmailAttachment[]
+      ...(payload.uploads.bloodwork || []),
+      ...(payload.uploads.physical || []),
+      ...(payload.uploads.cardio || []),
+      ...(payload.uploads.additional || [])
+    ]
   });
 
   return { applicationRecipient, medicalRecipient, betaMode };
 }
 
-function buildSummary(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment>>) {
+function buildSummary(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
   const uploadedList = (Object.keys(uploadLabels) as UploadKey[])
-    .filter((key) => uploads[key])
-    .map((key) => `- ${uploadLabels[key]}: ${uploads[key]?.filename}`)
+    .filter((key) => uploads[key]?.length)
+    .flatMap((key) => (uploads[key] || []).map((file) => `- ${uploadLabels[key]}: ${file.filename}`))
     .join("\n");
 
   return [

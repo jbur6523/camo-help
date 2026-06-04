@@ -9,11 +9,13 @@ const acceptedTypes = ".pdf,.jpg,.jpeg,.png,.heic,.heif";
 export function StepUploads({
   form,
   uploadFiles,
-  onFileChange
+  onFilesAdd,
+  onFileRemove
 }: {
   form: UseFormReturn<ApplicationData>;
   uploadFiles: UploadedFiles;
-  onFileChange: (key: UploadKey, file?: File) => void;
+  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void;
+  onFileRemove: (key: UploadKey, index: number) => void;
 }) {
   const age = Number(form.watch("age") || 0);
   const requiredUploads: UploadKey[] = age >= 40 ? ["bloodwork", "physical", "headshot", "photoId", "cardio"] : ["bloodwork", "physical", "headshot", "photoId"];
@@ -27,20 +29,45 @@ export function StepUploads({
           const required = requiredUploads.includes(key);
           if (key === "cardio" && age < 40) {
             return (
-              <UploadTile key={key} file={uploadFiles[key]} uploadKey={key} required={false} onFileChange={onFileChange}>
+              <UploadTile
+                key={key}
+                files={uploadFiles[key] || []}
+                uploadKey={key}
+                required={false}
+                multiple
+                onFilesAdd={onFilesAdd}
+                onFileRemove={onFileRemove}
+              >
                 Cardio/EKG is only required if the applicant is 40 or older.
               </UploadTile>
             );
           }
           if (key === "additional") {
             return (
-              <UploadTile key={key} file={uploadFiles[key]} uploadKey={key} required={false} onFileChange={onFileChange}>
+              <UploadTile
+                key={key}
+                files={uploadFiles[key] || []}
+                uploadKey={key}
+                required={false}
+                multiple
+                onFilesAdd={onFilesAdd}
+                onFileRemove={onFileRemove}
+              >
                 Optional. Add any extra supporting document.
               </UploadTile>
             );
           }
+          const multiple = key === "bloodwork" || key === "physical" || key === "cardio";
           return (
-            <UploadTile key={key} file={uploadFiles[key]} uploadKey={key} required={required} onFileChange={onFileChange}>
+            <UploadTile
+              key={key}
+              files={uploadFiles[key] || []}
+              uploadKey={key}
+              required={required}
+              multiple={multiple}
+              onFilesAdd={onFilesAdd}
+              onFileRemove={onFileRemove}
+            >
               {key === "headshot" ? "Clear color photo of your face, no sunglasses, similar to a passport photo." : null}
             </UploadTile>
           );
@@ -53,14 +80,18 @@ export function StepUploads({
 function UploadTile({
   uploadKey,
   required,
-  file,
-  onFileChange,
+  files,
+  multiple,
+  onFilesAdd,
+  onFileRemove,
   children
 }: {
   uploadKey: UploadKey;
   required: boolean;
-  file?: File;
-  onFileChange: (key: UploadKey, file?: File) => void;
+  files: File[];
+  multiple?: boolean;
+  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void;
+  onFileRemove: (key: UploadKey, index: number) => void;
   children?: React.ReactNode;
 }) {
   return (
@@ -72,9 +103,27 @@ function UploadTile({
       <input
         type="file"
         accept={acceptedTypes}
-        onChange={(event) => onFileChange(uploadKey, event.currentTarget.files?.[0])}
+        multiple={multiple}
+        onChange={(event) => {
+          const selectedFiles = Array.from(event.currentTarget.files || []);
+          if (selectedFiles.length) {
+            onFilesAdd(uploadKey, selectedFiles, { replace: !multiple });
+          }
+          event.currentTarget.value = "";
+        }}
       />
-      {file ? <small>Selected: {file.name}</small> : null}
+      {files.length ? (
+        <ul className="upload-file-list">
+          {files.map((file, index) => (
+            <li key={`${file.name}-${file.lastModified}-${index}`}>
+              <span>{file.name}</span>
+              <button type="button" onClick={() => onFileRemove(uploadKey, index)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

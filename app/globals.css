@@ -285,6 +285,8 @@ textarea {
   border-radius: 8px;
   background: #fbfcfb;
   padding: 14px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .fee-line,
@@ -294,6 +296,18 @@ textarea {
   gap: 16px;
   padding: 7px 0;
   border-bottom: 1px solid #edf0ee;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-line span,
+.review-line strong,
+.fee-line span,
+.fee-line strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .fee-line:last-child,
@@ -380,21 +394,69 @@ textarea {
   border-radius: 8px;
   padding: 14px;
   background: #fbfcfb;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .upload-tile input {
   margin-top: 10px;
+  max-width: 100%;
+}
+
+.upload-file-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-file-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.upload-file-list span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-file-list button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #e8ecea;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .checkbox-line {
   display: grid;
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
   padding: 12px 0;
   border-bottom: 1px solid #edf0ee;
   font-weight: 700;
   line-height: 1.35;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
 .checkbox-line input {
@@ -434,6 +496,27 @@ textarea {
   .field select,
   .field textarea {
     scroll-margin-bottom: 240px;
+  }
+
+  .review-line,
+  .fee-line {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .review-line strong,
+  .fee-line strong {
+    text-align: left;
+  }
+
+  .upload-file-list li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upload-file-list span {
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 }
 
@@ -512,10 +595,13 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+  min-width: 0;
 }
 
 .review-header h3 {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .download-list {

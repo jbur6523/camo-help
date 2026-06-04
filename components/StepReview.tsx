@@ -61,7 +61,11 @@ export function StepReview({
 
         <ReviewBlock title="Uploaded files" onEdit={() => onEdit(5)}>
           {(Object.keys(uploadLabels) as Array<keyof typeof uploadLabels>).map((key) => (
-            <ReviewLine key={key} label={uploadLabels[key]} value={uploadFiles[key]?.name || data.uploads[key] || "Not selected"} />
+            <ReviewLine
+              key={key}
+              label={uploadLabels[key]}
+              value={(uploadFiles[key] || []).map((file) => file.name).join(", ") || data.uploads[key] || "Not selected"}
+            />
           ))}
         </ReviewBlock>
 

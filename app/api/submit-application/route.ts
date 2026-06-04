@@ -22,9 +22,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Completed PDFs are missing." }, { status: 400 });
     }
 
-    const uploads: Record<string, Awaited<ReturnType<typeof attachmentFromForm>> | undefined> = {};
+    const uploads: Record<string, Awaited<ReturnType<typeof attachmentsFromForm>>> = {};
     for (const key of uploadKeys) {
-      uploads[key] = await attachmentFromForm(formData, key);
+      uploads[key] = await attachmentsFromForm(formData, key);
     }
 
     const result = await sendApplicationEmails({
@@ -49,4 +49,15 @@ async function attachmentFromForm(formData: FormData, key: string, fallbackName?
     content: Buffer.from(await file.arrayBuffer()),
     contentType: file.type || "application/octet-stream"
   };
+}
+
+async function attachmentsFromForm(formData: FormData, key: string) {
+  const files = formData.getAll(key).filter((file): file is File => file instanceof File && file.size > 0);
+  return Promise.all(
+    files.map(async (file) => ({
+      filename: file.name || key,
+      content: Buffer.from(await file.arrayBuffer()),
+      contentType: file.type || "application/octet-stream"
+    }))
+  );
 }

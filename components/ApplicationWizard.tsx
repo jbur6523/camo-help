@@ -168,7 +168,9 @@ export function ApplicationWizard() {
         {step === 2 ? <StepFighterHistory form={form} /> : null}
         {step === 3 ? <StepCommissionHistory form={form} /> : null}
         {step === 4 ? <StepLegalQuestions form={form} /> : null}
-        {step === 5 ? <StepUploads form={form} uploadFiles={uploadFiles} onFileChange={handleFileChange} /> : null}
+        {step === 5 ? (
+          <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} />
+        ) : null}
         {step === 6 ? <StepReview form={form} uploadFiles={uploadFiles} onEdit={setStep} /> : null}
         {step === 7 ? (
           <GenerateStep
@@ -198,9 +200,21 @@ export function ApplicationWizard() {
     </main>
   );
 
-  function handleFileChange(key: UploadKey, file?: File) {
-    setUploadFiles((current) => ({ ...current, [key]: file }));
-    setValue(`uploads.${key}` as any, file?.name || "", { shouldDirty: true });
+  function handleFilesAdd(key: UploadKey, files: File[], options?: { replace?: boolean }) {
+    setUploadFiles((current) => {
+      const nextFiles = options?.replace ? files : [...(current[key] || []), ...files];
+      setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
+      return { ...current, [key]: nextFiles };
+    });
+    setGlobalError("");
+  }
+
+  function handleFileRemove(key: UploadKey, index: number) {
+    setUploadFiles((current) => {
+      const nextFiles = (current[key] || []).filter((_, fileIndex) => fileIndex !== index);
+      setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
+      return { ...current, [key]: nextFiles };
+    });
     setGlobalError("");
   }
 
@@ -314,7 +328,7 @@ export function ApplicationWizard() {
       const requiredUploads: UploadKey[] = Number(values.age || 0) >= 40
         ? ["bloodwork", "physical", "headshot", "photoId", "cardio"]
         : ["bloodwork", "physical", "headshot", "photoId"];
-      const missing = requiredUploads.filter((key) => !uploadFiles[key]);
+      const missing = requiredUploads.filter((key) => !(uploadFiles[key] || []).length);
       if (missing.length) return fail(`Missing required upload: ${missing.join(", ")}.`);
     }
 
@@ -378,8 +392,8 @@ export function ApplicationWizard() {
       formData.append("application", JSON.stringify(values));
       formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
       formData.append("nationalIdPdf", new File([generated.nationalBlob], "completed-national-mma-id.pdf", { type: "application/pdf" }));
-      (Object.entries(uploadFiles) as Array<[UploadKey, File | undefined]>).forEach(([key, file]) => {
-        if (file) formData.append(key, file);
+      (Object.entries(uploadFiles) as Array<[UploadKey, File[] | undefined]>).forEach(([key, files]) => {
+        (files || []).forEach((file) => formData.append(key, file));
       });
 
       const response = await fetch("/api/submit-application", {

@@ -8,7 +8,7 @@ export type UploadKey =
   | "cardio"
   | "additional";
 
-export type UploadedFiles = Partial<Record<UploadKey, File>>;
+export type UploadedFiles = Partial<Record<UploadKey, File[]>>;
 
 export type FightEvent = {
   promoter: string;
