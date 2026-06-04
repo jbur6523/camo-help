@@ -150,6 +150,8 @@ textarea {
   padding: 20px 16px 180px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .step-title {
@@ -168,12 +170,25 @@ textarea {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
 .two-col {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.field,
+.field-grid > *,
+.entry-list,
+.entry-block,
+.choice-row,
+.fee-box,
+.notice,
+.review-block {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field label,
@@ -183,6 +198,8 @@ textarea {
   color: #263036;
   font-weight: 800;
   font-size: 14px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .field input,
@@ -466,14 +483,15 @@ textarea {
 
 .sticky-actions {
   position: fixed;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 0;
-  transform: translateX(-50%);
   z-index: 30;
   width: 100%;
   max-width: 520px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(82px, 116px) minmax(112px, 156px);
+  grid-template-columns: minmax(82px, 116px) minmax(0, 1fr);
   justify-content: space-between;
   gap: 10px;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
@@ -482,6 +500,12 @@ textarea {
   backdrop-filter: blur(12px);
   box-sizing: border-box;
   overflow: hidden;
+  contain: layout paint;
+}
+
+.sticky-actions > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (max-width: 699px) {
@@ -490,13 +514,25 @@ textarea {
   }
 
   .wizard-body {
-    padding-bottom: max(220px, calc(180px + env(safe-area-inset-bottom)));
+    padding-bottom: max(240px, calc(200px + env(safe-area-inset-bottom)));
   }
 
   .field input,
   .field select,
   .field textarea {
     scroll-margin-bottom: 240px;
+  }
+
+  .two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sticky-actions {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: minmax(82px, 108px) minmax(0, 1fr);
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .review-line,
