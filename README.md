@@ -55,25 +55,19 @@ Continuation pages are appended to the completed Athlete License PDF so the appl
 
 ## Email Configuration
 
-Copy `.env.example` to `.env.local` and configure server-side email credentials:
+Copy `.env.example` to `.env.local` and configure server-side Resend email credentials:
 
 ```env
 BETA_MODE=true
-APPLICATION_EMAIL_BETA=Kybunnylove@gmail.com
-MEDICAL_EMAIL_BETA=Joesph6523@gmail.com
-APPLICATION_EMAIL_PROD=info@camomma.org
-MEDICAL_EMAIL_PROD=medicals@camomma.org
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM="CAMO Fighter Application Helper <no-reply@example.com>"
+RESEND_API_KEY=
+EMAIL_FROM="CAMO Fighter Application Helper <no-reply@example.com>"
+LICENSE_EMAIL_TO=
+MEDICAL_EMAIL_TO=
 ```
 
-Beta mode sends application documents to `APPLICATION_EMAIL_BETA` and medical documents to `MEDICAL_EMAIL_BETA`. Set `BETA_MODE=false` to use the production recipients.
+Application documents, headshot, photo ID, and any additional documents are sent to `LICENSE_EMAIL_TO`. Blood work, physical, and Cardio/EKG files are sent to `MEDICAL_EMAIL_TO`. `BETA_MODE=true` adds a beta/testing routing note to the email body.
 
-Email credentials are only used in `app/api/submit-application/route.ts` and are not exposed to frontend code.
+`RESEND_API_KEY` is only used by server-side email code and is not exposed to frontend code.
 
 ## Payment URL
 
@@ -106,7 +100,7 @@ After importing the GitHub project into Vercel:
 
 1. Confirm the deployment URL loads.
 2. Keep `BETA_MODE=true`.
-3. Add beta recipient variables and SMTP variables in Vercel Project Settings.
+3. Add `RESEND_API_KEY`, `EMAIL_FROM`, `LICENSE_EMAIL_TO`, and `MEDICAL_EMAIL_TO` in Vercel Project Settings.
 4. Leave `NEXT_PUBLIC_CAMO_PAYMENT_URL` blank until the official payment URL is confirmed.
 5. Check `/api/config-status`; it returns booleans for beta mode, email configuration, and payment-link configuration without exposing secrets.
 6. Submit one test application with harmless test files before sharing the beta link.

@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, uploadLabels, type UploadKey } from "@/lib/types";
 
@@ -17,30 +17,15 @@ export type SubmissionEmailPayload = {
 
 export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
   const betaMode = process.env.BETA_MODE !== "false";
-  const applicationRecipient = betaMode
-    ? process.env.APPLICATION_EMAIL_BETA
-    : process.env.APPLICATION_EMAIL_PROD;
-  const medicalRecipient = betaMode ? process.env.MEDICAL_EMAIL_BETA : process.env.MEDICAL_EMAIL_PROD;
-
-  if (!applicationRecipient || !medicalRecipient) {
-    throw new Error("Email recipients are not configured.");
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: requiredEnv("SMTP_HOST"),
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: requiredEnv("SMTP_USER"),
-      pass: requiredEnv("SMTP_PASS")
-    }
-  });
+  const resend = new Resend(requiredEnv("RESEND_API_KEY"));
+  const from = requiredEnv("EMAIL_FROM");
+  const applicationRecipient = requiredEnv("LICENSE_EMAIL_TO");
+  const medicalRecipient = requiredEnv("MEDICAL_EMAIL_TO");
 
   const name = fullName(payload.application);
-  const summary = buildSummary(payload.application, payload.uploads);
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const summary = buildSummary(payload.application, payload.uploads, betaMode);
 
-  await transporter.sendMail({
+  await sendResendEmail(resend, {
     from,
     to: applicationRecipient,
     subject: `CAMO Application Documents - ${name}`,
@@ -49,11 +34,12 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
       payload.athletePdf,
       payload.nationalIdPdf,
       ...(payload.uploads.headshot || []),
-      ...(payload.uploads.photoId || [])
+      ...(payload.uploads.photoId || []),
+      ...(payload.uploads.additional || [])
     ]
   });
 
-  await transporter.sendMail({
+  await sendResendEmail(resend, {
     from,
     to: medicalRecipient,
     subject: `CAMO Medical Documents - ${name}`,
@@ -61,15 +47,41 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     attachments: [
       ...(payload.uploads.bloodwork || []),
       ...(payload.uploads.physical || []),
-      ...(payload.uploads.cardio || []),
-      ...(payload.uploads.additional || [])
+      ...(payload.uploads.cardio || [])
     ]
   });
 
   return { applicationRecipient, medicalRecipient, betaMode };
 }
 
-function buildSummary(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
+async function sendResendEmail(
+  resend: Resend,
+  email: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    attachments: EmailAttachment[];
+  }
+) {
+  const { error } = await resend.emails.send({
+    from: email.from,
+    to: email.to,
+    subject: email.subject,
+    text: email.text,
+    attachments: email.attachments.map((attachment) => ({
+      filename: attachment.filename,
+      content: attachment.content,
+      contentType: attachment.contentType
+    }))
+  });
+
+  if (error) {
+    throw new Error(`Resend email failed: ${error.message}`);
+  }
+}
+
+function buildSummary(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>, betaMode: boolean) {
   const uploadedList = (Object.keys(uploadLabels) as UploadKey[])
     .filter((key) => uploads[key]?.length)
     .flatMap((key) => (uploads[key] || []).map((file) => `- ${uploadLabels[key]}: ${file.filename}`))
@@ -84,12 +96,14 @@ function buildSummary(application: ApplicationData, uploads: Partial<Record<Uplo
     `National MMA ID type: ${application.nationalIdType}`,
     "",
     "Uploaded files:",
-    uploadedList || "- None"
+    uploadedList || "- None",
+    "",
+    betaMode ? "Routing note: This submission was sent using beta/testing routing." : "Routing note: Production recipient routing was used."
   ].join("\n");
 }
 
 function requiredEnv(name: string) {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is not configured.`);
+  if (!value) throw new Error(`Missing required email environment variable: ${name}`);
   return value;
 }
