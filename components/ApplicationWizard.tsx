@@ -325,9 +325,7 @@ export function ApplicationWizard() {
     }
 
     if (currentStep === 5) {
-      const requiredUploads: UploadKey[] = Number(values.age || 0) >= 40
-        ? ["bloodwork", "physical", "headshot", "photoId", "cardio"]
-        : ["bloodwork", "physical", "headshot", "photoId"];
+      const requiredUploads: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId"];
       const missing = requiredUploads.filter((key) => !(uploadFiles[key] || []).length);
       if (missing.length) return fail(`Missing required upload: ${missing.join(", ")}.`);
     }

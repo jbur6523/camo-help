@@ -17,8 +17,7 @@ export function StepUploads({
   onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void;
   onFileRemove: (key: UploadKey, index: number) => void;
 }) {
-  const age = Number(form.watch("age") || 0);
-  const requiredUploads: UploadKey[] = age >= 40 ? ["bloodwork", "physical", "headshot", "photoId", "cardio"] : ["bloodwork", "physical", "headshot", "photoId"];
+  const requiredUploads: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId"];
 
   return (
     <>
@@ -27,7 +26,7 @@ export function StepUploads({
       <div className="field-grid">
         {(["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"] as UploadKey[]).map((key) => {
           const required = requiredUploads.includes(key);
-          if (key === "cardio" && age < 40) {
+          if (key === "cardio") {
             return (
               <UploadTile
                 key={key}
@@ -38,7 +37,7 @@ export function StepUploads({
                 onFilesAdd={onFilesAdd}
                 onFileRemove={onFileRemove}
               >
-                Cardio/EKG is only required if the applicant is 40 or older.
+                Optional. Add Cardio/EKG documents if you have them.
               </UploadTile>
             );
           }
@@ -57,7 +56,7 @@ export function StepUploads({
               </UploadTile>
             );
           }
-          const multiple = key === "bloodwork" || key === "physical" || key === "cardio";
+          const multiple = key === "bloodwork" || key === "physical";
           return (
             <UploadTile
               key={key}
