@@ -9,6 +9,8 @@ const checks: Array<[boolean, string]> = [
   [css.includes(".wizard-bottom-nav"), "Shared wizard-bottom-nav styles must exist."],
   [!css.includes("translateX("), "Footer must not use translateX centering."],
   [!css.includes("width: 100vw"), "Layout must not use 100vw width with padding."],
+  [css.includes("width: 100dvw"), "Mobile footer must use dynamic viewport width to avoid Android overflow."],
+  [css.includes("right: auto"), "Mobile footer must not stretch with left/right fixed positioning."],
   [css.includes("overflow-x: hidden"), "Global horizontal overflow protection must remain."],
   [css.includes("@media (pointer: coarse) and (max-width: 900px)"), "Touch-device mobile footer rule must remain."]
 ];
