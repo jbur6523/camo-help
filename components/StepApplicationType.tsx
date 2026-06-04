@@ -4,7 +4,10 @@ import type { UseFormReturn } from "react-hook-form";
 import type { ApplicationData } from "@/lib/types";
 
 export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationData> }) {
-  const { register, watch } = form;
+  const { setValue, watch } = form;
+  const athleteLicenseType = watch("athleteLicenseType");
+  const nationalIdType = watch("nationalIdType");
+
   return (
     <>
       <h2 className="step-title">Application Type</h2>
@@ -14,10 +17,15 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
           <span className="field-label">Athlete License type</span>
           <div className="choice-row">
             {(["Original", "Renewal"] as const).map((type) => (
-              <label key={type}>
-                <input type="radio" value={type} {...register("athleteLicenseType", { required: true })} />
+              <button
+                aria-pressed={athleteLicenseType === type}
+                className="choice-button"
+                key={type}
+                type="button"
+                onClick={() => setValue("athleteLicenseType", type, { shouldDirty: true, shouldValidate: true })}
+              >
                 {type}
-              </label>
+              </button>
             ))}
           </div>
         </div>
@@ -25,10 +33,15 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
           <span className="field-label">National MMA ID type</span>
           <div className="choice-row three">
             {(["Original", "Renewal", "Replacement"] as const).map((type) => (
-              <label key={type}>
-                <input type="radio" value={type} {...register("nationalIdType", { required: true })} />
+              <button
+                aria-pressed={nationalIdType === type}
+                className="choice-button"
+                key={type}
+                type="button"
+                onClick={() => setValue("nationalIdType", type, { shouldDirty: true, shouldValidate: true })}
+              >
                 {type}
-              </label>
+              </button>
             ))}
           </div>
         </div>
@@ -51,8 +64,7 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
           after submission.
         </div>
         <p className="fine-print">
-          Selected: Athlete License {watch("athleteLicenseType") || "not selected"}, National MMA ID{" "}
-          {watch("nationalIdType") || "not selected"}.
+          Selected: Athlete License {athleteLicenseType || "not selected"}, National MMA ID {nationalIdType || "not selected"}.
         </p>
       </div>
     </>

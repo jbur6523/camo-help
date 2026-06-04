@@ -11,8 +11,17 @@
   --field: #f9faf9;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -32,10 +41,12 @@ textarea {
 
 .app-shell {
   min-height: 100vh;
+  width: 100%;
   max-width: 520px;
   margin: 0 auto;
   background: var(--panel);
   box-shadow: 0 0 0 1px rgba(21, 27, 31, 0.04);
+  overflow-x: hidden;
 }
 
 .landing {
@@ -137,6 +148,8 @@ textarea {
 
 .wizard-body {
   padding: 20px 16px 180px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .step-title {
@@ -155,10 +168,12 @@ textarea {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .two-col {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .field label,
@@ -207,25 +222,36 @@ textarea {
 
 .choice-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .choice-row.three {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.choice-button,
 .choice-row label {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 48px;
   padding: 10px;
   border: 1px solid #cbd3cf;
   border-radius: 8px;
   background: var(--field);
+  color: var(--ink);
   font-weight: 800;
   text-align: center;
+  line-height: 1.15;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .choice-row input {
@@ -237,6 +263,18 @@ textarea {
   color: white;
   background: var(--brand);
   border-color: var(--brand);
+}
+
+.choice-button[aria-pressed="true"] {
+  color: white;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.choice-row.three .choice-button {
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 13px;
 }
 
 .fee-box,
@@ -317,14 +355,18 @@ textarea {
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
-  width: min(100%, 520px);
+  z-index: 30;
+  width: 100%;
+  max-width: 520px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(82px, 0.42fr) minmax(0, 1fr);
   gap: 10px;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(12px);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 @media (max-width: 699px) {
@@ -350,6 +392,13 @@ textarea {
   padding: 0 18px;
   font-weight: 900;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sticky-actions .button {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .button.primary {
