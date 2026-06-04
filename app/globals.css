@@ -314,6 +314,7 @@ textarea {
 .entry-block {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .inline-actions {
@@ -321,6 +322,57 @@ textarea {
   justify-content: space-between;
   gap: 10px;
   margin-top: 12px;
+}
+
+.record-note {
+  margin: 0 0 12px;
+}
+
+.fight-summary {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #cfe1d9;
+  border-radius: 8px;
+  background: #eef5f1;
+}
+
+.fight-summary span {
+  color: #263036;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.fight-summary strong {
+  color: var(--brand-dark);
+}
+
+.fight-card {
+  background: #ffffff;
+}
+
+.fight-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fight-card-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.fight-card-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.add-fight-button {
+  width: 100%;
+  border: 1px solid #cbd3cf;
 }
 
 .upload-tile {

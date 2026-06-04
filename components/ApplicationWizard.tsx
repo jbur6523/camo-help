@@ -270,7 +270,21 @@ export function ApplicationWizard() {
       if (values.otherNames === "yes" && !values.otherNamesList.trim()) return fail("List the other name(s) used.");
       if (values.disqualified === "yes" && !values.disqualifiedExplanation.trim()) return fail("Explain the disqualification.");
       if (values.medicalLicenseIssue === "yes" && !values.medicalLicenseExplanation.trim()) return fail("Explain the medical license issue.");
-      if (fightRecordTotal(values) > 0 && (!values.fights.length || hasMissing(values.fights))) {
+      const requiredFightCount = fightRecordTotal(values);
+      const requiredFightFields = Array.from({ length: requiredFightCount }).flatMap((_, index) => [
+        `fights.${index}.promoter`,
+        `fights.${index}.state`,
+        `fights.${index}.date`,
+        `fights.${index}.opponent`,
+        `fights.${index}.outcome`
+      ]);
+      if (requiredFightFields.length && !(await form.trigger(requiredFightFields as never[]))) {
+        return fail("Complete the missing fight details before continuing.");
+      }
+      if (
+        requiredFightCount > 0 &&
+        (values.fights.length < requiredFightCount || hasMissing(values.fights.slice(0, requiredFightCount)))
+      ) {
         return fail("List complete verifiable amateur event details for your non-zero record.");
       }
     }
