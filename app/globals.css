@@ -57,6 +57,21 @@ textarea {
   letter-spacing: 0;
 }
 
+.beta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 16px;
+  padding: 0 12px;
+  border: 1px solid #f1d39b;
+  border-radius: 999px;
+  background: #fff8eb;
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .landing h1 {
   margin: 22px 0 10px;
   font-size: 34px;
@@ -352,6 +367,23 @@ textarea {
 
 .notice strong {
   color: var(--amber);
+}
+
+.config-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.config-strip span {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .review-header {

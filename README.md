@@ -93,3 +93,14 @@ Typed form progress is saved in browser local storage. Uploaded files are kept i
 6. Deploy.
 
 Because PDF templates are in `public/templates`, Vercel will serve them with the app.
+
+## Post-Import Beta Checklist
+
+After importing the GitHub project into Vercel:
+
+1. Confirm the deployment URL loads.
+2. Keep `BETA_MODE=true`.
+3. Add beta recipient variables and SMTP variables in Vercel Project Settings.
+4. Leave `NEXT_PUBLIC_CAMO_PAYMENT_URL` blank until the official payment URL is confirmed.
+5. Check `/api/config-status`; it returns booleans for beta mode, email configuration, and payment-link configuration without exposing secrets.
+6. Submit one test application with harmless test files before sharing the beta link.

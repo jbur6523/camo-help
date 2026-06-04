@@ -43,6 +43,12 @@ type GeneratedPdfs = {
   nationalUrl: string;
 };
 
+type ConfigStatus = {
+  betaMode: boolean;
+  paymentConfigured: boolean;
+  emailConfigured: boolean;
+};
+
 export function ApplicationWizard() {
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
@@ -51,6 +57,7 @@ export function ApplicationWizard() {
   const [isBusy, setIsBusy] = useState(false);
   const [pdfs, setPdfs] = useState<GeneratedPdfs | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
 
   const form = useForm<ApplicationData>({
     mode: "onBlur",
@@ -66,6 +73,13 @@ export function ApplicationWizard() {
       reset({ ...defaultApplicationData, ...JSON.parse(saved) });
     }
   }, [reset]);
+
+  useEffect(() => {
+    fetch("/api/config-status")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((status: ConfigStatus | null) => setConfigStatus(status))
+      .catch(() => setConfigStatus(null));
+  }, []);
 
   useEffect(() => {
     const subscription = watch((value) => {
@@ -102,6 +116,7 @@ export function ApplicationWizard() {
         <section className="landing">
           <div>
             <div className="brand-mark">CA</div>
+            {configStatus?.betaMode ? <div className="beta-pill">Beta Mode</div> : null}
             <h1>CAMO Fighter Application Helper</h1>
             <p>Complete your Athlete License and National MMA ID paperwork from your phone.</p>
             <ul className="plain-list">
@@ -113,6 +128,12 @@ export function ApplicationWizard() {
             <div className="notice">
               This app never asks for your CAMO username or password and does not attempt automated CAMO login.
             </div>
+            {configStatus ? (
+              <div className="config-strip" aria-label="Deployment configuration status">
+                <span>{configStatus.emailConfigured ? "Email ready" : "Email not configured"}</span>
+                <span>{configStatus.paymentConfigured ? "Payment link ready" : "Payment link pending"}</span>
+              </div>
+            ) : null}
           </div>
           <button className="button primary" type="button" onClick={() => setStarted(true)}>
             Start Application
