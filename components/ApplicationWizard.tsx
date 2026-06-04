@@ -10,6 +10,7 @@ import { StepLegalQuestions } from "@/components/StepLegalQuestions";
 import { StepUploads } from "@/components/StepUploads";
 import { StepReview } from "@/components/StepReview";
 import { SuccessPage } from "@/components/SuccessPage";
+import { WizardBottomNav } from "@/components/WizardBottomNav";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseFieldMap, nationalIdFieldMap } from "@/lib/pdf/pdfFieldMap";
@@ -183,20 +184,14 @@ export function ApplicationWizard() {
         ) : null}
       </form>
 
-      <div className="sticky-actions">
-        <button className="button secondary" type="button" onClick={goBack} disabled={step === 0 || isBusy}>
-          Back
-        </button>
-        {step < steps.length - 1 ? (
-          <button className="button primary" type="button" onClick={goNext} disabled={isBusy}>
-            Next
-          </button>
-        ) : (
-          <button className="button primary" type="button" onClick={submitDocuments} disabled={isBusy}>
-            {isBusy ? "Working..." : "Submit Documents"}
-          </button>
-        )}
-      </div>
+      <WizardBottomNav
+        isBusy={isBusy}
+        isFirstStep={step === 0}
+        isLastStep={step === steps.length - 1}
+        onBack={goBack}
+        onNext={goNext}
+        onSubmit={submitDocuments}
+      />
     </main>
   );
 

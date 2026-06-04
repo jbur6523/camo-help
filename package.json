@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "inspect:pdfs": "tsx scripts/inspect-pdfs.ts"
+    "inspect:pdfs": "tsx scripts/inspect-pdfs.ts",
+    "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
