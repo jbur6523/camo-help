@@ -329,7 +329,16 @@ export function ApplicationWizard() {
     }
 
     if (currentStep === 6) {
-      const requiredUploads: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId"];
+      const uploadRequirements: Array<Extract<UploadKey, "bloodwork" | "physical" | "headshot" | "photoId">> = [
+        "bloodwork",
+        "physical",
+        "headshot",
+        "photoId"
+      ];
+      const requirementsNeeded = values.requirementsNeeded || defaultApplicationData.requirementsNeeded;
+      const requiredUploads: UploadKey[] = uploadRequirements.filter((key) =>
+        requirementsNeeded.includes(key)
+      );
       const missing = requiredUploads.filter((key) => !(uploadFiles[key] || []).length);
       if (missing.length) return fail(`Missing required upload: ${missing.join(", ")}.`);
     }
