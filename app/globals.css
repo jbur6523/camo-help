@@ -492,35 +492,32 @@ textarea {
 .wizard-bottom-nav {
   position: fixed;
   left: 0;
-  right: auto;
+  right: 0;
   bottom: 0;
   z-index: 30;
   width: 100%;
   max-width: 100%;
   margin: 0;
-  display: grid;
-  grid-template-columns: minmax(82px, 116px) minmax(0, 1fr);
-  justify-content: space-between;
-  gap: 10px;
+  display: block;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(12px);
   box-sizing: border-box;
-  overflow: hidden;
-  contain: layout paint;
+  overflow-x: hidden;
 }
 
-@supports (width: 100dvw) {
-  .wizard-bottom-nav {
-    width: 100dvw;
-    max-width: 100dvw;
-  }
-}
-
-.wizard-bottom-nav > * {
-  min-width: 0;
+.wizard-bottom-nav-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 @media (max-width: 699px) {
@@ -543,9 +540,6 @@ textarea {
   }
 
   .wizard-bottom-nav {
-    left: 0;
-    right: auto;
-    grid-template-columns: minmax(82px, 108px) minmax(0, 1fr);
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
   }
@@ -586,17 +580,7 @@ textarea {
   }
 
   .wizard-bottom-nav {
-    width: 100%;
-    max-width: 100%;
-    margin-left: 0;
-    margin-right: 0;
     border-radius: 0;
-  }
-
-  .wizard-bottom-nav {
-    left: 0;
-    right: auto;
-    grid-template-columns: minmax(82px, 108px) minmax(0, 1fr);
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
   }
@@ -613,12 +597,13 @@ textarea {
 }
 
 .wizard-bottom-nav .button {
-  width: 100%;
+  width: min(42vw, 160px);
   max-width: 100%;
   min-width: 0;
   min-height: 46px;
-  padding-left: 14px;
-  padding-right: 14px;
+  flex: 0 0 auto;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .button.primary {
@@ -715,14 +700,5 @@ textarea {
     margin: 0 auto;
     border-radius: 14px;
     overflow: hidden;
-  }
-
-  .wizard-bottom-nav {
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-width: 520px;
-    margin-left: auto;
-    margin-right: auto;
   }
 }
