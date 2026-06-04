@@ -1,6 +1,6 @@
 import type { ApplicationData } from "@/lib/types";
 
-export const athleteLicenseTemplatePath = "/templates/Camo Athlete License - Fillable.pdf";
+export const athleteLicenseTemplatePath = "/templates/Camo_Athlete_Licnese_Fillable.pdf";
 export const nationalIdTemplatePath = "/templates/National ID form 0 Fillable.pdf";
 
 export type AcroFormFieldPlan = {
