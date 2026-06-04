@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import type { ApplicationData } from "@/lib/types";
-import { fullName, uploadLabels, type UploadKey } from "@/lib/types";
+import { fullName, type UploadKey } from "@/lib/types";
 
 export type EmailAttachment = {
   filename: string;
@@ -23,13 +23,12 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
   const medicalRecipient = requiredEnv("MEDICAL_EMAIL_TO");
 
   const name = fullName(payload.application);
-  const summary = buildSummary(payload.application, payload.uploads, betaMode);
 
   await sendResendEmail(resend, {
     from,
     to: applicationRecipient,
     subject: `CAMO Application Documents - ${name}`,
-    text: summary,
+    text: buildApplicationEmailBody(payload.application, betaMode),
     attachments: [
       payload.athletePdf,
       payload.nationalIdPdf,
@@ -43,7 +42,7 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     from,
     to: medicalRecipient,
     subject: `CAMO Medical Documents - ${name}`,
-    text: summary,
+    text: buildMedicalEmailBody(payload.application, betaMode),
     attachments: [
       ...(payload.uploads.bloodwork || []),
       ...(payload.uploads.physical || []),
@@ -81,12 +80,7 @@ async function sendResendEmail(
   }
 }
 
-function buildSummary(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>, betaMode: boolean) {
-  const uploadedList = (Object.keys(uploadLabels) as UploadKey[])
-    .filter((key) => uploads[key]?.length)
-    .flatMap((key) => (uploads[key] || []).map((file) => `- ${uploadLabels[key]}: ${file.filename}`))
-    .join("\n");
-
+function buildApplicationEmailBody(application: ApplicationData, betaMode: boolean) {
   return [
     `Applicant name: ${fullName(application)}`,
     `Date of birth: ${application.birthDate}`,
@@ -95,11 +89,29 @@ function buildSummary(application: ApplicationData, uploads: Partial<Record<Uplo
     `Athlete License type: ${application.athleteLicenseType}`,
     `National MMA ID type: ${application.nationalIdType}`,
     "",
-    "Uploaded files:",
-    uploadedList || "- None",
+    "Attached are the applicant's CAMO application documents, headshot, and photo ID.",
     "",
-    betaMode ? "Routing note: This submission was sent using beta/testing routing." : "Routing note: Production recipient routing was used."
+    routingNote(betaMode)
   ].join("\n");
+}
+
+function buildMedicalEmailBody(application: ApplicationData, betaMode: boolean) {
+  return [
+    `Applicant name: ${fullName(application)}`,
+    `Date of birth: ${application.birthDate}`,
+    `Email: ${application.email}`,
+    `Phone: ${application.phone}`,
+    "",
+    "Attached are the applicant's medical documents.",
+    "",
+    routingNote(betaMode)
+  ].join("\n");
+}
+
+function routingNote(betaMode: boolean) {
+  return betaMode
+    ? "Routing note: This submission was sent using beta/testing routing."
+    : "Routing note: Production recipient routing was used.";
 }
 
 function requiredEnv(name: string) {
