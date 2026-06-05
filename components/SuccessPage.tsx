@@ -11,7 +11,7 @@ export function SuccessPage({
   totalDue: number;
   documentsOnly?: boolean;
 }) {
-  const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL || "https://camo-mma.myshopify.com/account/login";
+  const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL;
   return (
     <main className="app-shell">
       <section className="wizard-body">
@@ -48,10 +48,14 @@ export function SuccessPage({
               Pay Now
             </a>
           </p>
-        ) : (
+        ) : totalDue > 0 ? (
           <div className="notice">
             <strong>Payment link has not been configured yet.</strong> Please add the official CAMO payment URL in the environment
             settings.
+          </div>
+        ) : (
+          <div className="notice">
+            <strong>No application payment selected.</strong>
           </div>
         )}
 
