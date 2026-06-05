@@ -131,7 +131,14 @@ export const requirementLabels: Record<RequirementKey, string> = {
   photoId: "Driver's License / State ID"
 };
 
-export const requirementOptions = Object.keys(requirementLabels) as RequirementKey[];
+export const requirementOptions: RequirementKey[] = [
+  "athleteLicenseApplication",
+  "nationalMmaIdApplication",
+  "bloodwork",
+  "physical",
+  "headshot",
+  "photoId"
+];
 
 export const defaultRequirementsNeeded: RequirementKey[] = [
   "athleteLicenseApplication",
