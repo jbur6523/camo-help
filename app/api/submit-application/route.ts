@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { NoSelectedEmailAttachmentsError, sendApplicationEmails } from "@/lib/email/sendApplicationEmails";
+import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
       uploads[key] = await attachmentsFromForm(formData, key);
     }
 
+    assertRequiredUploadsPresent(application, uploads);
+
     const result = await sendApplicationEmails({
       application,
       athletePdf,
@@ -42,7 +45,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
-    return NextResponse.json({ error: message }, { status: error instanceof NoSelectedEmailAttachmentsError ? 400 : 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: error instanceof NoSelectedEmailAttachmentsError || error instanceof MissingRequiredUploadsError ? 400 : 500 }
+    );
   }
 }
 
