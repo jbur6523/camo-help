@@ -19,7 +19,6 @@ import {
   calculateAge,
   defaultApplicationData,
   fightRecordTotal,
-  fullName,
   formatBirthDateInput,
   paymentTotal,
   type ApplicationData,
@@ -29,17 +28,42 @@ import {
 
 const storageKey = "camo-help-application-v1";
 
-const steps = [
-  "Requirements Needed",
-  "Applicant Info",
-  "Application Type",
-  "Fighter History",
-  "Prior Licenses",
-  "Legal",
-  "Uploads",
-  "Review",
-  "Generate PDFs"
+type StepId =
+  | "requirements"
+  | "applicantInfo"
+  | "applicationType"
+  | "fighterHistory"
+  | "commissionHistory"
+  | "legal"
+  | "uploads"
+  | "review"
+  | "generate";
+
+const fullWorkflowSteps: StepId[] = [
+  "requirements",
+  "applicantInfo",
+  "applicationType",
+  "fighterHistory",
+  "commissionHistory",
+  "legal",
+  "uploads",
+  "review",
+  "generate"
 ];
+
+const documentsOnlySteps: StepId[] = ["requirements", "applicantInfo", "uploads", "review", "generate"];
+
+const stepLabels: Record<StepId, string> = {
+  requirements: "Requirements Needed",
+  applicantInfo: "Applicant Info",
+  applicationType: "Application Type",
+  fighterHistory: "Fighter History",
+  commissionHistory: "Prior Licenses",
+  legal: "Legal",
+  uploads: "Uploads",
+  review: "Review",
+  generate: "Generate PDFs"
+};
 
 type GeneratedPdfs = {
   athleteBlob?: Blob;
@@ -56,7 +80,7 @@ type ConfigStatus = {
 
 export function ApplicationWizard() {
   const [started, setStarted] = useState(false);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<StepId>("requirements");
   const [uploadFiles, setUploadFiles] = useState<UploadedFiles>({});
   const [globalError, setGlobalError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -71,6 +95,9 @@ export function ApplicationWizard() {
 
   const { watch, setValue, reset } = form;
   const data = watch();
+  const documentsOnly = isDocumentsOnly(data);
+  const activeSteps = documentsOnly ? documentsOnlySteps : fullWorkflowSteps;
+  const activeStepIndex = Math.max(activeSteps.indexOf(step), 0);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey);
@@ -114,7 +141,7 @@ export function ApplicationWizard() {
     };
   }, [pdfs]);
 
-  const progress = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
+  const progress = useMemo(() => Math.round(((activeStepIndex + 1) / activeSteps.length) * 100), [activeStepIndex, activeSteps.length]);
 
   if (submitted && pdfs) {
     return (
@@ -122,6 +149,7 @@ export function ApplicationWizard() {
         athletePdfUrl={pdfs.athleteUrl}
         nationalPdfUrl={pdfs.nationalUrl}
         totalDue={paymentTotal(data.requirementsNeeded || defaultApplicationData.requirementsNeeded)}
+        documentsOnly={documentsOnly}
       />
     );
   }
@@ -163,8 +191,8 @@ export function ApplicationWizard() {
     <main className="app-shell">
       <header className="wizard-header">
         <div className="step-kicker">
-          <span>Step {step + 1} of {steps.length}</span>
-          <span>{steps[step]}</span>
+          <span>Step {activeStepIndex + 1} of {activeSteps.length}</span>
+          <span>{documentsOnly && step === "generate" ? "Submit" : stepLabels[step]}</span>
         </div>
         <div className="progress-track" aria-label="Application progress">
           <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -173,31 +201,32 @@ export function ApplicationWizard() {
 
       <form className="wizard-body" onFocusCapture={scrollFocusedFieldIntoView} onSubmit={(event) => event.preventDefault()}>
         {globalError ? <div className="notice" style={{ marginBottom: 16 }}><strong>Check this:</strong> {globalError}</div> : null}
-        {step === 0 ? <StepRequirementsNeeded form={form} /> : null}
-        {step === 1 ? <StepApplicantInfo form={form} /> : null}
-        {step === 2 ? <StepApplicationType form={form} /> : null}
-        {step === 3 ? <StepFighterHistory form={form} /> : null}
-        {step === 4 ? <StepCommissionHistory form={form} /> : null}
-        {step === 5 ? <StepLegalQuestions form={form} /> : null}
-        {step === 6 ? (
+        {step === "requirements" ? <StepRequirementsNeeded form={form} /> : null}
+        {step === "applicantInfo" ? <StepApplicantInfo form={form} short={documentsOnly} /> : null}
+        {step === "applicationType" ? <StepApplicationType form={form} /> : null}
+        {step === "fighterHistory" ? <StepFighterHistory form={form} /> : null}
+        {step === "commissionHistory" ? <StepCommissionHistory form={form} /> : null}
+        {step === "legal" ? <StepLegalQuestions form={form} /> : null}
+        {step === "uploads" ? (
           <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} />
         ) : null}
-        {step === 7 ? <StepReview form={form} uploadFiles={uploadFiles} onEdit={setStep} /> : null}
-        {step === 8 ? (
+        {step === "review" ? <StepReview form={form} uploadFiles={uploadFiles} documentsOnly={documentsOnly} onEdit={setStep} /> : null}
+        {step === "generate" ? (
           <GenerateStep
             pdfs={pdfs}
             isBusy={isBusy}
             onGenerate={generatePdfs}
             onSubmit={submitDocuments}
             paymentConfigured={Boolean(process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL)}
+            documentsOnly={documentsOnly}
           />
         ) : null}
       </form>
 
       <WizardBottomNav
         isBusy={isBusy}
-        isFirstStep={step === 0}
-        isLastStep={step === steps.length - 1}
+        isFirstStep={activeStepIndex === 0}
+        isLastStep={activeStepIndex === activeSteps.length - 1}
         onBack={goBack}
         onNext={goNext}
         onSubmit={submitDocuments}
@@ -227,51 +256,55 @@ export function ApplicationWizard() {
     const valid = await validateStep(step);
     if (!valid) return;
     setGlobalError("");
-    setStep((current) => Math.min(current + 1, steps.length - 1));
+    setStep(activeSteps[Math.min(activeStepIndex + 1, activeSteps.length - 1)]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function goBack() {
     setGlobalError("");
-    setStep((current) => Math.max(current - 1, 0));
+    setStep(activeSteps[Math.max(activeStepIndex - 1, 0)]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function validateStep(currentStep: number) {
+  async function validateStep(currentStep: StepId) {
     const values = form.getValues();
     const requireFields: Array<keyof ApplicationData> =
-      currentStep === 0
+      currentStep === "requirements"
         ? ["requirementsNeeded"]
-        : currentStep === 1
-        ? [
-            "firstName",
-            "lastName",
-            "birthDate",
-            "age",
-            "sex",
-            "phone",
-            "email",
-            "street",
-            "city",
-            "state",
-            "zip",
-            "country",
-            "ssnLast4",
-            "heightFeet",
-            "heightInches",
-            "weight"
-          ]
-        : currentStep === 2
-          ? ["athleteLicenseType", "nationalIdType"]
-          : currentStep === 7
-            ? [
-                "certifyTrue",
-                "certifyConsequences",
-                "certifyHelperOnly",
-                "certifyPaymentSeparate",
-                "signatureName",
-                "signatureDate"
+        : currentStep === "applicantInfo"
+          ? documentsOnly
+            ? ["firstName", "lastName", "birthDate", "phone", "email"]
+            : [
+                "firstName",
+                "lastName",
+                "birthDate",
+                "age",
+                "sex",
+                "phone",
+                "email",
+                "street",
+                "city",
+                "state",
+                "zip",
+                "country",
+                "ssnLast4",
+                "heightFeet",
+                "heightInches",
+                "weight"
               ]
+        : currentStep === "applicationType"
+          ? ["athleteLicenseType", "nationalIdType"]
+          : currentStep === "review"
+            ? documentsOnly
+              ? ["certifyHelperOnly"]
+              : [
+                  "certifyTrue",
+                  "certifyConsequences",
+                  "certifyHelperOnly",
+                  "certifyPaymentSeparate",
+                  "signatureName",
+                  "signatureDate"
+                ]
             : [];
 
     if (requireFields.length && !(await form.trigger(requireFields))) {
@@ -279,19 +312,19 @@ export function ApplicationWizard() {
       return false;
     }
 
-    if (currentStep === 0) {
+    if (currentStep === "requirements") {
       if (!(values.requirementsNeeded || []).length) return fail("Select at least one item to submit now.");
     }
 
-    if (currentStep === 1) {
+    if (currentStep === "applicantInfo") {
       if (!calculateAge(values.birthDate)) return fail("Enter a real birth date as MM/DD/YYYY.");
-      if (!isValidAge(values.age)) return fail("Enter a valid age.");
+      if (!documentsOnly && !isValidAge(values.age)) return fail("Enter a valid age.");
       if (!/^\S+@\S+\.\S+$/.test(values.email)) return fail("Enter a valid email address.");
-      if (/p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
-      if (!/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
+      if (!documentsOnly && /p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
+      if (!documentsOnly && !/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
     }
 
-    if (currentStep === 3) {
+    if (currentStep === "fighterHistory") {
       if (values.otherNames === "yes" && !values.otherNamesList.trim()) return fail("List the other name(s) used.");
       if (values.disqualified === "yes" && !values.disqualifiedExplanation.trim()) return fail("Explain the disqualification.");
       if (values.medicalLicenseIssue === "yes" && !values.medicalLicenseExplanation.trim()) return fail("Explain the medical license issue.");
@@ -314,7 +347,7 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 4) {
+    if (currentStep === "commissionHistory") {
       if (values.licensedBefore === "yes" && (!values.priorLicenses.length || hasMissing(values.priorLicenses))) {
         return fail("Add complete prior license entries.");
       }
@@ -326,7 +359,7 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 5) {
+    if (currentStep === "legal") {
       if (values.convictedCrime === "yes" && (!values.convictions.length || hasMissing(values.convictions))) {
         return fail("Add complete conviction entries.");
       }
@@ -335,10 +368,11 @@ export function ApplicationWizard() {
       }
     }
 
-    if (currentStep === 6) {
-      const uploadRequirements: Array<Extract<UploadKey, "bloodwork" | "physical" | "headshot" | "photoId">> = [
+    if (currentStep === "uploads") {
+      const uploadRequirements: Array<Extract<UploadKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">> = [
         "bloodwork",
         "physical",
+        "cardio",
         "headshot",
         "photoId"
       ];
@@ -402,8 +436,8 @@ export function ApplicationWizard() {
   }
 
   async function submitDocuments() {
-    if (!(await validateStep(7))) {
-      setStep(7);
+    if (!(await validateStep("review"))) {
+      setStep("review");
       return;
     }
 
@@ -447,22 +481,30 @@ function GenerateStep({
   isBusy,
   onGenerate,
   onSubmit,
-  paymentConfigured
+  paymentConfigured,
+  documentsOnly
 }: {
   pdfs: GeneratedPdfs | null;
   isBusy: boolean;
   onGenerate: () => Promise<GeneratedPdfs | null>;
   onSubmit: () => Promise<void>;
   paymentConfigured: boolean;
+  documentsOnly: boolean;
 }) {
   return (
     <>
-      <h2 className="step-title">Generate PDFs</h2>
-      <p className="step-help">Create the completed CAMO PDFs, preview or download them, then submit documents by email.</p>
+      <h2 className="step-title">{documentsOnly ? "Submit Documents" : "Generate PDFs"}</h2>
+      <p className="step-help">
+        {documentsOnly
+          ? "Send the selected documents to CAMO."
+          : "Create the completed CAMO PDFs, preview or download them, then submit documents by email."}
+      </p>
       <div className="field-grid">
-        <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
-          {isBusy ? "Generating..." : "Generate Completed PDFs"}
-        </button>
+        {documentsOnly ? null : (
+          <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
+            {isBusy ? "Generating..." : "Generate Completed PDFs"}
+          </button>
+        )}
         {pdfs ? (
           <div className="download-list">
             {pdfs.athleteUrl ? (
@@ -488,9 +530,11 @@ function GenerateStep({
           </div>
         ) : null}
         <div className="notice">
-          Emails will be sent to the configured beta or production recipients. Payment is not collected in this app.
+          {documentsOnly
+            ? "Selected documents will be sent to the configured beta or production recipients."
+            : "Emails will be sent to the configured beta or production recipients. Payment is not collected in this app."}
         </div>
-        {!paymentConfigured ? (
+        {!documentsOnly && !paymentConfigured ? (
           <div className="notice">
             <strong>Payment link has not been configured yet.</strong> Add the official CAMO payment URL as
             NEXT_PUBLIC_CAMO_PAYMENT_URL before using the Pay Now button in production.
@@ -515,6 +559,11 @@ function toArrayBuffer(bytes: Uint8Array) {
 function isValidAge(age: string) {
   const value = Number(age);
   return Number.isInteger(value) && value >= 0 && value < 120;
+}
+
+function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {
+  const requirementsNeeded = data.requirementsNeeded || defaultApplicationData.requirementsNeeded;
+  return !requirementsNeeded.includes("athleteLicenseApplication") && !requirementsNeeded.includes("nationalMmaIdApplication");
 }
 
 function scrollFocusedFieldIntoView(event: React.FocusEvent<HTMLFormElement>) {

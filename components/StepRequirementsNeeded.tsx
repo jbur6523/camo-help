@@ -2,7 +2,7 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import type { ApplicationData } from "@/lib/types";
-import { defaultRequirementsNeeded, requirementLabels } from "@/lib/types";
+import { requirementLabels, requirementOptions } from "@/lib/types";
 
 export function StepRequirementsNeeded({ form }: { form: UseFormReturn<ApplicationData> }) {
   const { register, watch, formState } = form;
@@ -13,7 +13,7 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
       <h2 className="step-title">What do you still need help submitting?</h2>
       <p className="step-help">Everything is selected by default. Uncheck anything you have already submitted to CAMO.</p>
       <div className="review-block">
-        {defaultRequirementsNeeded.map((key) => (
+        {requirementOptions.map((key) => (
           <label className="checkbox-line" key={key}>
             <input type="checkbox" value={key} {...register("requirementsNeeded")} />
             {requirementLabels[key]}

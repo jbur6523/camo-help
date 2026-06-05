@@ -3,11 +3,13 @@
 export function SuccessPage({
   athletePdfUrl,
   nationalPdfUrl,
-  totalDue
+  totalDue,
+  documentsOnly = false
 }: {
   athletePdfUrl?: string;
   nationalPdfUrl?: string;
   totalDue: number;
+  documentsOnly?: boolean;
 }) {
   const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL || "https://camo-mma.myshopify.com/account/login";
   return (
@@ -16,7 +18,9 @@ export function SuccessPage({
         <div className="brand-mark">CA</div>
         <h1 className="step-title">Documents Submitted</h1>
         <p className="step-help">
-          Your application documents have been prepared and sent. The last step is to complete payment through CAMO.
+          {documentsOnly
+            ? "Your selected documents have been submitted."
+            : "Your application documents have been prepared and sent. The last step is to complete payment through CAMO."}
         </p>
 
         <div className="fee-box">
@@ -33,12 +37,12 @@ export function SuccessPage({
             </div>
           ) : null}
           <div className="fee-line">
-            <span>Total</span>
+            <span>{totalDue > 0 ? "Total" : "No application payment selected."}</span>
             <strong>${totalDue}</strong>
           </div>
         </div>
 
-        {paymentUrl ? (
+        {totalDue > 0 && paymentUrl ? (
           <p>
             <a className="button primary" href={paymentUrl} target="_blank" rel="noreferrer" style={{ display: "grid", placeItems: "center", textDecoration: "none" }}>
               Pay Now

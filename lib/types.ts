@@ -15,6 +15,7 @@ export type RequirementKey =
   | "nationalMmaIdApplication"
   | "bloodwork"
   | "physical"
+  | "cardio"
   | "headshot"
   | "photoId";
 
@@ -125,11 +126,21 @@ export const requirementLabels: Record<RequirementKey, string> = {
   nationalMmaIdApplication: "National MMA ID Application",
   bloodwork: "Blood Work",
   physical: "Physical",
+  cardio: "Cardio/EKG document",
   headshot: "Headshot Photo",
   photoId: "Driver's License / State ID"
 };
 
-export const defaultRequirementsNeeded = Object.keys(requirementLabels) as RequirementKey[];
+export const requirementOptions = Object.keys(requirementLabels) as RequirementKey[];
+
+export const defaultRequirementsNeeded: RequirementKey[] = [
+  "athleteLicenseApplication",
+  "nationalMmaIdApplication",
+  "bloodwork",
+  "physical",
+  "headshot",
+  "photoId"
+];
 
 export function paymentTotal(requirementsNeeded: RequirementKey[] = defaultRequirementsNeeded) {
   return (

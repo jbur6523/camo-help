@@ -2,13 +2,13 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import type { ApplicationData } from "@/lib/types";
-import { paymentTotal } from "@/lib/types";
+import { defaultRequirementsNeeded, paymentTotal } from "@/lib/types";
 
 export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationData> }) {
   const { setValue, watch } = form;
   const athleteLicenseType = watch("athleteLicenseType");
   const nationalIdType = watch("nationalIdType");
-  const requirementsNeeded = watch("requirementsNeeded");
+  const requirementsNeeded = watch("requirementsNeeded") || defaultRequirementsNeeded;
   const needsAthleteLicense = requirementsNeeded.includes("athleteLicenseApplication");
   const needsNationalId = requirementsNeeded.includes("nationalMmaIdApplication");
 

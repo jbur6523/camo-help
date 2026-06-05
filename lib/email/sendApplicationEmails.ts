@@ -87,7 +87,8 @@ export function buildSubmissionEmailMessages(
   ];
   const medicalAttachments = [
     ...(requirementsNeeded.includes("bloodwork") ? payload.uploads.bloodwork || [] : []),
-    ...(requirementsNeeded.includes("physical") ? payload.uploads.physical || [] : [])
+    ...(requirementsNeeded.includes("physical") ? payload.uploads.physical || [] : []),
+    ...(requirementsNeeded.includes("cardio") ? payload.uploads.cardio || [] : [])
   ];
   const messages: SubmissionEmailMessage[] = [];
 
