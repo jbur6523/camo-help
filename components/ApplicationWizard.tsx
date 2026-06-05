@@ -21,6 +21,7 @@ import {
   fightRecordTotal,
   fullName,
   formatBirthDateInput,
+  paymentTotal,
   type ApplicationData,
   type UploadKey,
   type UploadedFiles
@@ -41,10 +42,10 @@ const steps = [
 ];
 
 type GeneratedPdfs = {
-  athleteBlob: Blob;
-  nationalBlob: Blob;
-  athleteUrl: string;
-  nationalUrl: string;
+  athleteBlob?: Blob;
+  nationalBlob?: Blob;
+  athleteUrl?: string;
+  nationalUrl?: string;
 };
 
 type ConfigStatus = {
@@ -107,8 +108,8 @@ export function ApplicationWizard() {
   useEffect(() => {
     return () => {
       if (pdfs) {
-        URL.revokeObjectURL(pdfs.athleteUrl);
-        URL.revokeObjectURL(pdfs.nationalUrl);
+        if (pdfs.athleteUrl) URL.revokeObjectURL(pdfs.athleteUrl);
+        if (pdfs.nationalUrl) URL.revokeObjectURL(pdfs.nationalUrl);
       }
     };
   }, [pdfs]);
@@ -116,7 +117,13 @@ export function ApplicationWizard() {
   const progress = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
 
   if (submitted && pdfs) {
-    return <SuccessPage athletePdfUrl={pdfs.athleteUrl} nationalPdfUrl={pdfs.nationalUrl} />;
+    return (
+      <SuccessPage
+        athletePdfUrl={pdfs.athleteUrl}
+        nationalPdfUrl={pdfs.nationalUrl}
+        totalDue={paymentTotal(data.requirementsNeeded || defaultApplicationData.requirementsNeeded)}
+      />
+    );
   }
 
   if (!started) {
@@ -356,26 +363,33 @@ export function ApplicationWizard() {
     setIsBusy(true);
     setGlobalError("");
     try {
-      const [athleteTemplate, nationalTemplate] = await Promise.all([
-        fetch(athleteLicenseTemplatePath).then((response) => response.arrayBuffer()),
-        fetch(nationalIdTemplatePath).then((response) => response.arrayBuffer())
-      ]);
       const values = form.getValues();
+      const requirementsNeeded = values.requirementsNeeded || defaultApplicationData.requirementsNeeded;
+      const needsAthleteLicense = requirementsNeeded.includes("athleteLicenseApplication");
+      const needsNationalId = requirementsNeeded.includes("nationalMmaIdApplication");
       const [athleteBytes, nationalBytes] = await Promise.all([
-        generateAthleteLicensePdf(athleteTemplate, values),
-        generateNationalIdPdf(nationalTemplate, values)
+        needsAthleteLicense
+          ? fetch(athleteLicenseTemplatePath)
+              .then((response) => response.arrayBuffer())
+              .then((template) => generateAthleteLicensePdf(template, values))
+          : Promise.resolve(undefined),
+        needsNationalId
+          ? fetch(nationalIdTemplatePath)
+              .then((response) => response.arrayBuffer())
+              .then((template) => generateNationalIdPdf(template, values))
+          : Promise.resolve(undefined)
       ]);
       if (pdfs) {
-        URL.revokeObjectURL(pdfs.athleteUrl);
-        URL.revokeObjectURL(pdfs.nationalUrl);
+        if (pdfs.athleteUrl) URL.revokeObjectURL(pdfs.athleteUrl);
+        if (pdfs.nationalUrl) URL.revokeObjectURL(pdfs.nationalUrl);
       }
-      const athleteBlob = new Blob([toArrayBuffer(athleteBytes)], { type: "application/pdf" });
-      const nationalBlob = new Blob([toArrayBuffer(nationalBytes)], { type: "application/pdf" });
+      const athleteBlob = athleteBytes ? new Blob([toArrayBuffer(athleteBytes)], { type: "application/pdf" }) : undefined;
+      const nationalBlob = nationalBytes ? new Blob([toArrayBuffer(nationalBytes)], { type: "application/pdf" }) : undefined;
       const generated = {
         athleteBlob,
         nationalBlob,
-        athleteUrl: URL.createObjectURL(athleteBlob),
-        nationalUrl: URL.createObjectURL(nationalBlob)
+        athleteUrl: athleteBlob ? URL.createObjectURL(athleteBlob) : undefined,
+        nationalUrl: nationalBlob ? URL.createObjectURL(nationalBlob) : undefined
       };
       setPdfs(generated);
       return generated;
@@ -401,8 +415,12 @@ export function ApplicationWizard() {
       const values = form.getValues();
       const formData = new FormData();
       formData.append("application", JSON.stringify(values));
-      formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
-      formData.append("nationalIdPdf", new File([generated.nationalBlob], "completed-national-mma-id.pdf", { type: "application/pdf" }));
+      if (generated.athleteBlob) {
+        formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
+      }
+      if (generated.nationalBlob) {
+        formData.append("nationalIdPdf", new File([generated.nationalBlob], "completed-national-mma-id.pdf", { type: "application/pdf" }));
+      }
       (Object.entries(uploadFiles) as Array<[UploadKey, File[] | undefined]>).forEach(([key, files]) => {
         (files || []).forEach((file) => formData.append(key, file));
       });
@@ -447,18 +465,26 @@ function GenerateStep({
         </button>
         {pdfs ? (
           <div className="download-list">
-            <a href={pdfs.athleteUrl} target="_blank" rel="noreferrer">
-              Preview Athlete License PDF
-            </a>
-            <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
-              Download Athlete License PDF
-            </a>
-            <a href={pdfs.nationalUrl} target="_blank" rel="noreferrer">
-              Preview National MMA ID PDF
-            </a>
-            <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
-              Download National MMA ID PDF
-            </a>
+            {pdfs.athleteUrl ? (
+              <>
+                <a href={pdfs.athleteUrl} target="_blank" rel="noreferrer">
+                  Preview Athlete License PDF
+                </a>
+                <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
+                  Download Athlete License PDF
+                </a>
+              </>
+            ) : null}
+            {pdfs.nationalUrl ? (
+              <>
+                <a href={pdfs.nationalUrl} target="_blank" rel="noreferrer">
+                  Preview National MMA ID PDF
+                </a>
+                <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
+                  Download National MMA ID PDF
+                </a>
+              </>
+            ) : null}
           </div>
         ) : null}
         <div className="notice">

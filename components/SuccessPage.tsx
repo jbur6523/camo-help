@@ -2,10 +2,12 @@
 
 export function SuccessPage({
   athletePdfUrl,
-  nationalPdfUrl
+  nationalPdfUrl,
+  totalDue
 }: {
-  athletePdfUrl: string;
-  nationalPdfUrl: string;
+  athletePdfUrl?: string;
+  nationalPdfUrl?: string;
+  totalDue: number;
 }) {
   const paymentUrl = process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL || "https://camo-mma.myshopify.com/account/login";
   return (
@@ -18,17 +20,21 @@ export function SuccessPage({
         </p>
 
         <div className="fee-box">
-          <div className="fee-line">
-            <span>Athlete License</span>
-            <strong>$75</strong>
-          </div>
-          <div className="fee-line">
-            <span>National MMA ID Card</span>
-            <strong>$20</strong>
-          </div>
+          {athletePdfUrl ? (
+            <div className="fee-line">
+              <span>Athlete License</span>
+              <strong>$75</strong>
+            </div>
+          ) : null}
+          {nationalPdfUrl ? (
+            <div className="fee-line">
+              <span>National MMA ID Card</span>
+              <strong>$20</strong>
+            </div>
+          ) : null}
           <div className="fee-line">
             <span>Total</span>
-            <strong>$95</strong>
+            <strong>${totalDue}</strong>
           </div>
         </div>
 
@@ -46,12 +52,16 @@ export function SuccessPage({
         )}
 
         <div className="download-list">
-          <a href={athletePdfUrl} download="completed-athlete-license.pdf">
-            Download Athlete License PDF
-          </a>
-          <a href={nationalPdfUrl} download="completed-national-mma-id.pdf">
-            Download National MMA ID PDF
-          </a>
+          {athletePdfUrl ? (
+            <a href={athletePdfUrl} download="completed-athlete-license.pdf">
+              Download Athlete License PDF
+            </a>
+          ) : null}
+          {nationalPdfUrl ? (
+            <a href={nationalPdfUrl} download="completed-national-mma-id.pdf">
+              Download National MMA ID PDF
+            </a>
+          ) : null}
         </div>
 
         <div className="notice">

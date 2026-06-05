@@ -131,6 +131,13 @@ export const requirementLabels: Record<RequirementKey, string> = {
 
 export const defaultRequirementsNeeded = Object.keys(requirementLabels) as RequirementKey[];
 
+export function paymentTotal(requirementsNeeded: RequirementKey[] = defaultRequirementsNeeded) {
+  return (
+    (requirementsNeeded.includes("athleteLicenseApplication") ? 75 : 0) +
+    (requirementsNeeded.includes("nationalMmaIdApplication") ? 20 : 0)
+  );
+}
+
 export const defaultApplicationData: ApplicationData = {
   firstName: "",
   middleName: "",

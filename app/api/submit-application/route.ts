@@ -17,9 +17,14 @@ export async function POST(request: Request) {
     const application = JSON.parse(applicationJson) as ApplicationData;
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
+    const requirementsNeeded = application.requirementsNeeded || [];
 
-    if (!athletePdf || !nationalIdPdf) {
-      return NextResponse.json({ error: "Completed PDFs are missing." }, { status: 400 });
+    if (requirementsNeeded.includes("athleteLicenseApplication") && !athletePdf) {
+      return NextResponse.json({ error: "Completed Athlete License PDF is missing." }, { status: 400 });
+    }
+
+    if (requirementsNeeded.includes("nationalMmaIdApplication") && !nationalIdPdf) {
+      return NextResponse.json({ error: "Completed National MMA ID PDF is missing." }, { status: 400 });
     }
 
     const uploads: Record<string, Awaited<ReturnType<typeof attachmentsFromForm>>> = {};

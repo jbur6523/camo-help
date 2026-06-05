@@ -3,7 +3,7 @@
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
-import { defaultRequirementsNeeded, fullName, requirementLabels, uploadLabels } from "@/lib/types";
+import { defaultRequirementsNeeded, fullName, paymentTotal, requirementLabels, uploadLabels } from "@/lib/types";
 
 export function StepReview({
   form,
@@ -81,17 +81,21 @@ export function StepReview({
         </ReviewBlock>
 
         <div className="fee-box">
-          <div className="fee-line">
-            <span>Athlete License</span>
-            <strong>$75</strong>
-          </div>
-          <div className="fee-line">
-            <span>National MMA ID</span>
-            <strong>$20</strong>
-          </div>
+          {requirementsNeeded.includes("athleteLicenseApplication") ? (
+            <div className="fee-line">
+              <span>Athlete License</span>
+              <strong>$75</strong>
+            </div>
+          ) : null}
+          {requirementsNeeded.includes("nationalMmaIdApplication") ? (
+            <div className="fee-line">
+              <span>National MMA ID</span>
+              <strong>$20</strong>
+            </div>
+          ) : null}
           <div className="fee-line">
             <span>Total</span>
-            <strong>$95</strong>
+            <strong>${paymentTotal(requirementsNeeded)}</strong>
           </div>
         </div>
 

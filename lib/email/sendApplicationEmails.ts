@@ -10,8 +10,8 @@ export type EmailAttachment = {
 
 export type SubmissionEmailPayload = {
   application: ApplicationData;
-  athletePdf: EmailAttachment;
-  nationalIdPdf: EmailAttachment;
+  athletePdf?: EmailAttachment;
+  nationalIdPdf?: EmailAttachment;
   uploads: Partial<Record<UploadKey, EmailAttachment[]>>;
 };
 
@@ -30,8 +30,8 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     subject: `CAMO Application Documents - ${name}`,
     text: buildApplicationEmailBody(payload.application, betaMode),
     attachments: [
-      payload.athletePdf,
-      payload.nationalIdPdf,
+      ...(payload.athletePdf ? [payload.athletePdf] : []),
+      ...(payload.nationalIdPdf ? [payload.nationalIdPdf] : []),
       ...(payload.uploads.headshot || []),
       ...(payload.uploads.photoId || []),
       ...(payload.uploads.additional || [])

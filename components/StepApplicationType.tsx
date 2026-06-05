@@ -2,11 +2,15 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import type { ApplicationData } from "@/lib/types";
+import { paymentTotal } from "@/lib/types";
 
 export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationData> }) {
   const { setValue, watch } = form;
   const athleteLicenseType = watch("athleteLicenseType");
   const nationalIdType = watch("nationalIdType");
+  const requirementsNeeded = watch("requirementsNeeded");
+  const needsAthleteLicense = requirementsNeeded.includes("athleteLicenseApplication");
+  const needsNationalId = requirementsNeeded.includes("nationalMmaIdApplication");
 
   return (
     <>
@@ -46,17 +50,21 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
           </div>
         </div>
         <div className="fee-box">
-          <div className="fee-line">
-            <span>Athlete License</span>
-            <strong>$75</strong>
-          </div>
-          <div className="fee-line">
-            <span>National MMA ID Card</span>
-            <strong>$20</strong>
-          </div>
+          {needsAthleteLicense ? (
+            <div className="fee-line">
+              <span>Athlete License</span>
+              <strong>$75</strong>
+            </div>
+          ) : null}
+          {needsNationalId ? (
+            <div className="fee-line">
+              <span>National MMA ID Card</span>
+              <strong>$20</strong>
+            </div>
+          ) : null}
           <div className="fee-line">
             <span>Estimated total due to CAMO</span>
-            <strong>$95</strong>
+            <strong>${paymentTotal(requirementsNeeded)}</strong>
           </div>
         </div>
         <div className="notice">
