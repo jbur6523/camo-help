@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { independentPromotionName } from "@/lib/promoters/constants";
+import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
 
@@ -59,9 +59,12 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     attachments: message.attachments
   })));
 
+  const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application);
+
   return {
     applicationRecipient: messages.some((message) => message.kind === "application") ? applicationRecipient : null,
     medicalRecipient: messages.some((message) => message.kind === "medical") ? medicalRecipient : null,
+    promoterRecipient,
     betaMode
   };
 }
@@ -143,6 +146,50 @@ async function sendResendEmail(
   }
 }
 
+async function sendPromoterNotificationEmail(resend: Resend, from: string, application: ApplicationData) {
+  const selectedPromoterId = application.selectedPromoterId;
+  if (!selectedPromoterId || selectedPromoterId === independentPromoterId) return null;
+
+  try {
+    const { createSupabaseServiceRoleClient } = await import("@/lib/supabase/server");
+    const supabase = createSupabaseServiceRoleClient();
+    const { data: promoter, error } = await supabase
+      .from("promoters")
+      .select("id, promotion_name, promoter_email, status")
+      .eq("id", selectedPromoterId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (error) {
+      console.warn(`Promoter notification skipped: ${error.message}`);
+      return null;
+    }
+
+    if (!promoter || promoter.status !== "active" || !promoter.promoter_email) {
+      console.warn(`Promoter notification skipped: selected promoter is not active (${selectedPromoterId}).`);
+      return null;
+    }
+
+    const { error: emailError } = await resend.emails.send({
+      from,
+      to: promoter.promoter_email,
+      subject: `New Fighter Submission - ${fullName(application)}`,
+      text: buildPromoterNotificationBody(application, new Date())
+    });
+
+    if (emailError) {
+      console.warn(`Promoter notification email failed: ${emailError.message}`);
+      return null;
+    }
+
+    return promoter.promoter_email as string;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown promoter notification error.";
+    console.warn(`Promoter notification skipped: ${message}`);
+    return null;
+  }
+}
+
 function buildApplicationEmailBody(application: ApplicationData, betaMode: boolean) {
   return [
     `Applicant name: ${fullName(application)}`,
@@ -170,6 +217,19 @@ function buildMedicalEmailBody(application: ApplicationData, betaMode: boolean) 
     "Attached are the selected medical documents.",
     "",
     routingNote(betaMode)
+  ].join("\n");
+}
+
+export function buildPromoterNotificationBody(application: ApplicationData, submittedAt: Date) {
+  return [
+    `Fighter name: ${fullName(application)}`,
+    `Fighter email: ${application.email}`,
+    `Fighter phone: ${application.phone}`,
+    `Date of birth: ${application.birthDate}`,
+    `Requirements submitted: ${selectedRequirementLabels(application)}`,
+    `Submission date/time: ${submittedAt.toISOString()}`,
+    "",
+    "No medical documents, IDs, headshots, or PDFs are included in this promoter notification."
   ].join("\n");
 }
 
