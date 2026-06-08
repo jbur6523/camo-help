@@ -112,6 +112,18 @@ textarea {
   font-weight: 700;
 }
 
+.landing-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.landing-actions .button {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  text-decoration: none;
+}
+
 .wizard-header {
   position: sticky;
   top: 0;

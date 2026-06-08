@@ -45,5 +45,11 @@ export type Database = {
         };
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      promoter_status: PromoterStatus;
+    };
+    CompositeTypes: Record<string, never>;
   };
 };
