@@ -5,6 +5,8 @@ import type { ApplicationData, UploadKey, UploadedFiles } from "@/lib/types";
 import { defaultApplicationData, uploadLabels } from "@/lib/types";
 
 const acceptedTypes = ".pdf,.jpg,.jpeg,.png,.heic,.heif";
+const uploadOrder: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"];
+const requirementDrivenUploadKeys: Array<Exclude<UploadKey, "additional">> = ["bloodwork", "physical", "cardio", "headshot", "photoId"];
 
 export function StepUploads({
   form,
@@ -18,22 +20,37 @@ export function StepUploads({
   onFileRemove: (key: UploadKey, index: number) => void;
 }) {
   const requirementsNeeded = form.watch("requirementsNeeded") || defaultApplicationData.requirementsNeeded;
-  const requiredUploads: Array<Extract<UploadKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">> = [
-    "bloodwork",
-    "physical",
-    "cardio",
-    "headshot",
-    "photoId"
-  ];
+  const visibleUploadKeys = uploadOrder.filter((key) => key === "additional" || requirementsNeeded.includes(key));
+  const requiredUploadKeys = requirementDrivenUploadKeys.filter((key) => requirementsNeeded.includes(key));
 
   return (
     <>
       <h2 className="step-title">Uploads</h2>
       <p className="step-help">Attach the documents CAMO needs. Files are sent when you submit and are not committed to the repo.</p>
       <div className="field-grid">
-        {(["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"] as UploadKey[]).map((key) => {
-          const uploadRequirementKey = key as Extract<UploadKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">;
-          const required = requiredUploads.includes(uploadRequirementKey) && requirementsNeeded.includes(uploadRequirementKey);
+        <section className="review-block">
+          <div className="review-header">
+            <h3>Required Documents</h3>
+          </div>
+          {requiredUploadKeys.length ? (
+            <ul className="compact-list">
+              {requiredUploadKeys.map((key) => (
+                <li key={key}>
+                  {displayUploadLabel(key)}
+                  {key === "cardio" ? " - Only required for athletes 40+." : ""}
+                </li>
+              ))}
+              <li>{displayUploadLabel("additional")} - Optional</li>
+            </ul>
+          ) : (
+            <ul className="compact-list">
+              <li>{displayUploadLabel("additional")} - Optional</li>
+            </ul>
+          )}
+        </section>
+
+        {visibleUploadKeys.map((key) => {
+          const required = key !== "additional" && requiredUploadKeys.includes(key);
           if (key === "cardio") {
             return (
               <UploadTile
@@ -45,7 +62,7 @@ export function StepUploads({
                 onFilesAdd={onFilesAdd}
                 onFileRemove={onFileRemove}
               >
-                Optional. Add Cardio/EKG documents if you have them.
+                Only required for athletes 40+.
               </UploadTile>
             );
           }
@@ -58,12 +75,12 @@ export function StepUploads({
                 required={false}
                 multiple
                 onFilesAdd={onFilesAdd}
-                onFileRemove={onFileRemove}
-              >
-                Optional. Add any extra supporting document.
-              </UploadTile>
-            );
-          }
+              onFileRemove={onFileRemove}
+            >
+              Optional. Add any extra supporting document.
+            </UploadTile>
+          );
+        }
           const multiple = key === "bloodwork" || key === "physical";
           return (
             <UploadTile
@@ -104,7 +121,7 @@ function UploadTile({
   return (
     <div className="upload-tile">
       <span className="field-label">
-        {uploadLabels[uploadKey]} {required ? "*" : ""}
+        {displayUploadLabel(uploadKey)} {required ? "*" : ""}
       </span>
       {children ? <small>{children}</small> : null}
       <input
@@ -133,4 +150,14 @@ function UploadTile({
       ) : null}
     </div>
   );
+}
+
+function displayUploadLabel(key: UploadKey) {
+  if (key === "bloodwork") return "Blood Work";
+  if (key === "physical") return "Physical Exam";
+  if (key === "cardio") return "Cardio/EKG document";
+  if (key === "headshot") return "Headshot/Selfie";
+  if (key === "photoId") return "Driver License / State ID";
+  if (key === "additional") return "Additional Documentation";
+  return uploadLabels[key];
 }
