@@ -164,15 +164,6 @@ export function ApplicationWizard() {
             {configStatus?.betaMode ? <div className="beta-pill">Beta Mode</div> : null}
             <h1>CAMO Fighter Application Helper</h1>
             <p>Complete your Athlete License and National MMA ID paperwork from your phone.</p>
-            <ul className="plain-list">
-              <li>Fill out your information once.</li>
-              <li>Upload your medicals, physical, headshot, and ID.</li>
-              <li>Generate your completed PDFs.</li>
-              <li>Submit documents and finish payment through CAMO.</li>
-            </ul>
-            <div className="notice">
-              This app never asks for your CAMO username or password and does not attempt automated CAMO login.
-            </div>
             <div className="notice">
               <p>
                 <strong>Need blood work?</strong> Call Request A Test and ask to book the Combat Trio Blood Test for your CAMO
@@ -182,6 +173,12 @@ export function ApplicationWizard() {
                 Call Now To Book Your Blood Work - Combat Trio Blood Test: {combatTrioPhoneDisplay}
               </a>
             </div>
+            <ul className="plain-list">
+              <li>Fill out your information once.</li>
+              <li>Upload your medicals, physical, headshot, and ID.</li>
+              <li>Generate your completed PDFs.</li>
+              <li>Submit documents and finish payment through CAMO.</li>
+            </ul>
             {configStatus ? (
               <div className="config-strip" aria-label="Deployment configuration status">
                 <span>{configStatus.emailConfigured ? "Email ready" : "Email not configured"}</span>
