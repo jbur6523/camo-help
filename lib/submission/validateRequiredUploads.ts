@@ -3,12 +3,11 @@ import { requirementLabels, type ApplicationData, type RequirementKey, type Uplo
 type UploadedAttachmentMap = Partial<Record<UploadKey, unknown[]>>;
 
 const requiredUploadGroups: Array<{
-  requirement: Extract<RequirementKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">;
-  uploadKey: Extract<UploadKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">;
+  requirement: Extract<RequirementKey, "bloodwork" | "physical" | "headshot" | "photoId">;
+  uploadKey: Extract<UploadKey, "bloodwork" | "physical" | "headshot" | "photoId">;
 }> = [
   { requirement: "bloodwork", uploadKey: "bloodwork" },
   { requirement: "physical", uploadKey: "physical" },
-  { requirement: "cardio", uploadKey: "cardio" },
   { requirement: "headshot", uploadKey: "headshot" },
   { requirement: "photoId", uploadKey: "photoId" }
 ];

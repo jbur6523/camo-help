@@ -387,10 +387,9 @@ export function ApplicationWizard() {
     }
 
     if (currentStep === "uploads") {
-      const uploadRequirements: Array<Extract<UploadKey, "bloodwork" | "physical" | "cardio" | "headshot" | "photoId">> = [
+      const uploadRequirements: Array<Extract<UploadKey, "bloodwork" | "physical" | "headshot" | "photoId">> = [
         "bloodwork",
         "physical",
-        "cardio",
         "headshot",
         "photoId"
       ];

@@ -17,7 +17,6 @@ export type RequirementKey =
   | "nationalMmaIdApplication"
   | "bloodwork"
   | "physical"
-  | "cardio"
   | "headshot"
   | "photoId";
 
@@ -131,7 +130,6 @@ export const requirementLabels: Record<RequirementKey, string> = {
   nationalMmaIdApplication: "National MMA ID Application",
   bloodwork: "Blood Work",
   physical: "Physical",
-  cardio: "Cardio/EKG document",
   headshot: "Headshot Photo",
   photoId: "Driver's License / State ID"
 };

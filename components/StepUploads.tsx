@@ -6,7 +6,7 @@ import { defaultApplicationData, uploadLabels } from "@/lib/types";
 
 const acceptedTypes = ".pdf,.jpg,.jpeg,.png,.heic,.heif";
 const uploadOrder: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"];
-const requirementDrivenUploadKeys: Array<Exclude<UploadKey, "additional">> = ["bloodwork", "physical", "cardio", "headshot", "photoId"];
+const requirementDrivenUploadKeys: Array<Exclude<UploadKey, "cardio" | "additional">> = ["bloodwork", "physical", "headshot", "photoId"];
 const alwaysVisibleUploadKeys: UploadKey[] = ["cardio", "additional"];
 
 export function StepUploads({
@@ -22,7 +22,7 @@ export function StepUploads({
 }) {
   const requirementsNeeded = form.watch("requirementsNeeded") || defaultApplicationData.requirementsNeeded;
   const visibleUploadKeys = uploadOrder.filter(
-    (key) => alwaysVisibleUploadKeys.includes(key) || (key !== "additional" && requirementsNeeded.includes(key))
+    (key) => alwaysVisibleUploadKeys.includes(key) || (key !== "cardio" && key !== "additional" && requirementsNeeded.includes(key))
   );
   const requiredUploadKeys = requirementDrivenUploadKeys.filter((key) => requirementsNeeded.includes(key));
 
@@ -38,22 +38,16 @@ export function StepUploads({
           {requiredUploadKeys.length ? (
             <ul className="compact-list">
               {requiredUploadKeys.map((key) => (
-                <li key={key}>
-                  {displayUploadLabel(key)}
-                  {key === "cardio" ? " - Only required for athletes 40+." : ""}
-                </li>
+                <li key={key}>{displayUploadLabel(key)}</li>
               ))}
-              <li>{displayUploadLabel("additional")} - Optional</li>
             </ul>
           ) : (
-            <ul className="compact-list">
-              <li>{displayUploadLabel("additional")} - Optional</li>
-            </ul>
+            <p className="step-help">No required uploads based on your selected requirements.</p>
           )}
         </section>
 
         {visibleUploadKeys.map((key) => {
-          const required = key !== "additional" && requiredUploadKeys.includes(key);
+          const required = key !== "cardio" && key !== "additional" && requiredUploadKeys.includes(key);
           if (key === "cardio") {
             return (
               <UploadTile
@@ -65,7 +59,7 @@ export function StepUploads({
                 onFilesAdd={onFilesAdd}
                 onFileRemove={onFileRemove}
               >
-                Only required for athletes 40+.
+                Only required for fighters/athletes 40+.
               </UploadTile>
             );
           }
@@ -78,12 +72,12 @@ export function StepUploads({
                 required={false}
                 multiple
                 onFilesAdd={onFilesAdd}
-              onFileRemove={onFileRemove}
-            >
-              Optional. Add any extra supporting document.
-            </UploadTile>
-          );
-        }
+                onFileRemove={onFileRemove}
+              >
+                Optional. Add any extra supporting document.
+              </UploadTile>
+            );
+          }
           const multiple = key === "bloodwork" || key === "physical";
           return (
             <UploadTile
@@ -158,7 +152,7 @@ function UploadTile({
 function displayUploadLabel(key: UploadKey) {
   if (key === "bloodwork") return "Blood Work";
   if (key === "physical") return "Physical Exam";
-  if (key === "cardio") return "Cardio/EKG document";
+  if (key === "cardio") return "Cardio/EKG Document";
   if (key === "headshot") return "Headshot/Selfie";
   if (key === "photoId") return "Driver License / State ID";
   if (key === "additional") return "Additional Documentation";
