@@ -77,28 +77,6 @@ export function StepReview({
           />
         </ReviewBlock>
 
-        <section className="review-block">
-          <div className="review-header">
-            <h3>Select Promotion</h3>
-          </div>
-          <div className="field">
-            <label htmlFor="selectedPromoterId">Please Select Promotion</label>
-            <select id="selectedPromoterId" value={selectedPromoterId} onChange={handlePromoterChange}>
-              <option value={independentPromoterId}>{independentPromotionName}</option>
-              {promoters.map((promoter) => (
-                <option key={promoter.id} value={promoter.id}>
-                  {promoter.promotionName}
-                </option>
-              ))}
-            </select>
-            {promotersLoaded && !promoters.length ? (
-              <small>No approved promotions are listed yet. You can continue as Not listed / Independent.</small>
-            ) : null}
-            {promoterLoadError ? <div className="error">{promoterLoadError}</div> : null}
-          </div>
-          <ReviewLine label="Selected promotion" value={selectedPromotionName} />
-        </section>
-
         <ReviewBlock title="Applicant info" onEdit={() => onEdit("applicantInfo")}>
           <ReviewLine label="Name" value={fullName(data)} />
           <ReviewLine label="Birth date" value={`${data.birthDate} (${data.age || "age unknown"})`} />
@@ -236,6 +214,28 @@ export function StepReview({
             <Field label="Signature date" name="signatureDate" register={register} errors={formState.errors} required type="date" />
           </>
         )}
+
+        <section className="review-block">
+          <div className="review-header">
+            <h3>Select Promotion</h3>
+          </div>
+          <div className="field">
+            <label htmlFor="selectedPromoterId">Please Select Promotion</label>
+            <select id="selectedPromoterId" value={selectedPromoterId} onChange={handlePromoterChange}>
+              <option value={independentPromoterId}>{independentPromotionName}</option>
+              {promoters.map((promoter) => (
+                <option key={promoter.id} value={promoter.id}>
+                  {promoter.promotionName}
+                </option>
+              ))}
+            </select>
+            {promotersLoaded && !promoters.length ? (
+              <small>No approved promotions are listed yet. You can continue as Not listed / Independent.</small>
+            ) : null}
+            {promoterLoadError ? <div className="error">{promoterLoadError}</div> : null}
+          </div>
+          <ReviewLine label="Selected promotion" value={selectedPromotionName} />
+        </section>
       </div>
     </>
   );
