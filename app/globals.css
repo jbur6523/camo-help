@@ -735,6 +735,57 @@ textarea {
   text-decoration: none;
 }
 
+.admin-page {
+  padding-bottom: 32px;
+}
+
+.admin-promoter-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-promoter-card {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #e8ecea;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: #dff3ea;
+  color: var(--brand-dark);
+}
+
+.status-pending {
+  background: #fff8eb;
+  color: var(--amber);
+}
+
+.status-denied,
+.status-disabled {
+  background: #f5e6e3;
+  color: var(--danger);
+}
+
 @media (min-width: 700px) {
   body {
     padding: 24px 0;
