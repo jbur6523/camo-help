@@ -2,6 +2,7 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
+import { physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
 import { fullName, paymentTotal, requirementLabels, requirementOptions, uploadLabels } from "@/lib/types";
 
@@ -21,6 +22,7 @@ export function StepReview({
   const requirementsNeeded = data.requirementsNeeded || [];
   const submittingNow = requirementOptions.filter((key) => requirementsNeeded.includes(key));
   const alreadyCompleted = requirementOptions.filter((key) => !requirementsNeeded.includes(key));
+  const needsMedicalAcknowledgement = requirementsNeeded.includes("bloodwork") || requirementsNeeded.includes("physical");
   return (
     <>
       <h2 className="step-title">Review</h2>
@@ -146,6 +148,23 @@ export function StepReview({
               ) : null}
             </>
           )}
+          {needsMedicalAcknowledgement ? (
+            <>
+              <label className="checkbox-line">
+                <input
+                  type="checkbox"
+                  {...register("certifyMedicalRequirements", { required: "Medical requirements acknowledgement is required." })}
+                />
+                <span>
+                  {physicalMdDoAcknowledgement} I acknowledge the blood test must include HIV 4th Generation, Hepatitis C Antibody, and
+                  Hepatitis B <strong>Surface Antigen</strong>.
+                </span>
+              </label>
+              {formState.errors.certifyMedicalRequirements ? (
+                <div className="error">Medical requirements acknowledgement is required.</div>
+              ) : null}
+            </>
+          ) : null}
         </div>
 
         {documentsOnly ? null : (

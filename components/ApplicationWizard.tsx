@@ -12,6 +12,7 @@ import { StepUploads } from "@/components/StepUploads";
 import { StepReview } from "@/components/StepReview";
 import { SuccessPage } from "@/components/SuccessPage";
 import { WizardBottomNav } from "@/components/WizardBottomNav";
+import { combatTrioTestUrl } from "@/lib/medicalRequirements";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
@@ -172,6 +173,12 @@ export function ApplicationWizard() {
             <div className="notice">
               This app never asks for your CAMO username or password and does not attempt automated CAMO login.
             </div>
+            <div className="notice">
+              <strong>Need blood work?</strong> The Combat Trio test covers the blood test items CAMO requires.
+              <a className="notice-link" href={combatTrioTestUrl} target="_blank" rel="noreferrer">
+                Book Blood Test Here - Combat Trio Test
+              </a>
+            </div>
             {configStatus ? (
               <div className="config-strip" aria-label="Deployment configuration status">
                 <span>{configStatus.emailConfigured ? "Email ready" : "Email not configured"}</span>
@@ -294,18 +301,24 @@ export function ApplicationWizard() {
               ]
         : currentStep === "applicationType"
           ? ["athleteLicenseType", "nationalIdType"]
-          : currentStep === "review"
-            ? documentsOnly
-              ? ["certifyHelperOnly"]
-              : [
-                  "certifyTrue",
-                  "certifyConsequences",
-                  "certifyHelperOnly",
-                  "certifyPaymentSeparate",
-                  "signatureName",
-                  "signatureDate"
-                ]
-            : [];
+        : currentStep === "review"
+          ? documentsOnly
+            ? ["certifyHelperOnly"]
+            : [
+                "certifyTrue",
+                "certifyConsequences",
+                "certifyHelperOnly",
+                "certifyPaymentSeparate",
+                "signatureName",
+                "signatureDate"
+              ]
+          : [];
+    const needsMedicalAcknowledgement =
+      currentStep === "review" &&
+      ((values.requirementsNeeded || []).includes("bloodwork") || (values.requirementsNeeded || []).includes("physical"));
+    if (needsMedicalAcknowledgement) {
+      requireFields.push("certifyMedicalRequirements");
+    }
 
     if (requireFields.length && !(await form.trigger(requireFields))) {
       setGlobalError("Please complete the required fields before continuing.");

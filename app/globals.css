@@ -648,6 +648,30 @@ textarea {
   color: var(--amber);
 }
 
+.notice p {
+  margin: 0 0 10px;
+}
+
+.notice p:last-child {
+  margin-bottom: 0;
+}
+
+.compact-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.compact-list li {
+  margin: 4px 0;
+}
+
+.notice-link {
+  display: inline-block;
+  color: var(--brand-dark);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 .config-strip {
   display: grid;
   grid-template-columns: 1fr;

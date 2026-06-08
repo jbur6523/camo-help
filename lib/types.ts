@@ -108,6 +108,7 @@ export type ApplicationData = {
   certifyConsequences: boolean;
   certifyHelperOnly: boolean;
   certifyPaymentSeparate: boolean;
+  certifyMedicalRequirements: boolean;
   signatureName: string;
   signatureDate: string;
 };
@@ -203,6 +204,7 @@ export const defaultApplicationData: ApplicationData = {
   certifyConsequences: false,
   certifyHelperOnly: false,
   certifyPaymentSeparate: false,
+  certifyMedicalRequirements: false,
   signatureName: "",
   signatureDate: new Date().toISOString().slice(0, 10)
 };
