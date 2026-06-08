@@ -648,6 +648,10 @@ textarea {
   color: var(--amber);
 }
 
+.requirements-note {
+  margin-top: 12px;
+}
+
 .notice p {
   margin: 0 0 10px;
 }

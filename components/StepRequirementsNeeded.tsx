@@ -1,7 +1,12 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
-import { bloodTestRequirements, combatTrioTestUrl, physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
+import {
+  bloodTestRequirements,
+  combatTrioPhoneDisplay,
+  combatTrioPhoneHref,
+  physicalMdDoAcknowledgement
+} from "@/lib/medicalRequirements";
 import type { ApplicationData } from "@/lib/types";
 import { requirementLabels, requirementOptions } from "@/lib/types";
 
@@ -27,7 +32,7 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
         ) : null}
       </div>
       {showPhysicalRequirement || showBloodworkRequirement ? (
-        <div className="notice">
+        <div className="notice requirements-note">
           {showPhysicalRequirement ? (
             <p>
               <strong>Physical requirement:</strong> {physicalMdDoAcknowledgement}
@@ -45,8 +50,11 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
                   {bloodTestRequirements[2]} <strong>Surface Antigen</strong>
                 </li>
               </ul>
-              <a className="notice-link" href={combatTrioTestUrl} target="_blank" rel="noreferrer">
-                Book Blood Test Here - Combat Trio Test
+              <p>
+                Call Request A Test at {combatTrioPhoneDisplay} and ask to book the Combat Trio Blood Test for your CAMO blood work.
+              </p>
+              <a className="notice-link" href={combatTrioPhoneHref}>
+                Call Now To Book Your Blood Work - Combat Trio Blood Test
               </a>
             </>
           ) : null}
