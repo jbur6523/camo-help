@@ -7,6 +7,7 @@ import { defaultApplicationData, uploadLabels } from "@/lib/types";
 const acceptedTypes = ".pdf,.jpg,.jpeg,.png,.heic,.heif";
 const uploadOrder: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"];
 const requirementDrivenUploadKeys: Array<Exclude<UploadKey, "additional">> = ["bloodwork", "physical", "cardio", "headshot", "photoId"];
+const alwaysVisibleUploadKeys: UploadKey[] = ["cardio", "additional"];
 
 export function StepUploads({
   form,
@@ -20,7 +21,9 @@ export function StepUploads({
   onFileRemove: (key: UploadKey, index: number) => void;
 }) {
   const requirementsNeeded = form.watch("requirementsNeeded") || defaultApplicationData.requirementsNeeded;
-  const visibleUploadKeys = uploadOrder.filter((key) => key === "additional" || requirementsNeeded.includes(key));
+  const visibleUploadKeys = uploadOrder.filter(
+    (key) => alwaysVisibleUploadKeys.includes(key) || (key !== "additional" && requirementsNeeded.includes(key))
+  );
   const requiredUploadKeys = requirementDrivenUploadKeys.filter((key) => requirementsNeeded.includes(key));
 
   return (
