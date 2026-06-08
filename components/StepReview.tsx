@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
 import { physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
+import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
 import { fullName, paymentTotal, requirementLabels, requirementOptions, uploadLabels } from "@/lib/types";
+
+type PromoterOption = {
+  id: string;
+  promotionName: string;
+};
 
 export function StepReview({
   form,
@@ -17,12 +24,46 @@ export function StepReview({
   documentsOnly: boolean;
   onEdit: (step: "requirements" | "applicantInfo" | "applicationType" | "fighterHistory" | "commissionHistory" | "legal" | "uploads") => void;
 }) {
-  const { register, watch, formState } = form;
+  const { register, watch, formState, setValue, getValues } = form;
+  const [promoters, setPromoters] = useState<PromoterOption[]>([]);
+  const [promotersLoaded, setPromotersLoaded] = useState(false);
+  const [promoterLoadError, setPromoterLoadError] = useState("");
   const data = watch();
   const requirementsNeeded = data.requirementsNeeded || [];
   const submittingNow = requirementOptions.filter((key) => requirementsNeeded.includes(key));
   const alreadyCompleted = requirementOptions.filter((key) => !requirementsNeeded.includes(key));
   const needsMedicalAcknowledgement = requirementsNeeded.includes("bloodwork") || requirementsNeeded.includes("physical");
+  const selectedPromoterId = data.selectedPromoterId || independentPromoterId;
+  const selectedPromotionName = data.selectedPromotionName || independentPromotionName;
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/promoters")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Could not load approved promotions."))))
+      .then((result: { promoters?: PromoterOption[] }) => {
+        if (!active) return;
+        const activePromoters = result.promoters || [];
+        setPromoters(activePromoters);
+        setPromotersLoaded(true);
+        const currentPromoterId = getValues("selectedPromoterId") || independentPromoterId;
+        if (
+          currentPromoterId !== independentPromoterId &&
+          !activePromoters.some((promoter) => promoter.id === currentPromoterId)
+        ) {
+          setValue("selectedPromoterId", independentPromoterId, { shouldDirty: true });
+          setValue("selectedPromotionName", independentPromotionName, { shouldDirty: true });
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setPromotersLoaded(true);
+        setPromoterLoadError("Could not load approved promotions. You can continue as Not listed / Independent.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [getValues, setValue]);
+
   return (
     <>
       <h2 className="step-title">Review</h2>
@@ -35,6 +76,28 @@ export function StepReview({
             value={alreadyCompleted.map((key) => requirementLabels[key]).join(", ") || "None"}
           />
         </ReviewBlock>
+
+        <section className="review-block">
+          <div className="review-header">
+            <h3>Select Promotion</h3>
+          </div>
+          <div className="field">
+            <label htmlFor="selectedPromoterId">Please Select Promotion</label>
+            <select id="selectedPromoterId" value={selectedPromoterId} onChange={handlePromoterChange}>
+              <option value={independentPromoterId}>{independentPromotionName}</option>
+              {promoters.map((promoter) => (
+                <option key={promoter.id} value={promoter.id}>
+                  {promoter.promotionName}
+                </option>
+              ))}
+            </select>
+            {promotersLoaded && !promoters.length ? (
+              <small>No approved promotions are listed yet. You can continue as Not listed / Independent.</small>
+            ) : null}
+            {promoterLoadError ? <div className="error">{promoterLoadError}</div> : null}
+          </div>
+          <ReviewLine label="Selected promotion" value={selectedPromotionName} />
+        </section>
 
         <ReviewBlock title="Applicant info" onEdit={() => onEdit("applicantInfo")}>
           <ReviewLine label="Name" value={fullName(data)} />
@@ -176,6 +239,19 @@ export function StepReview({
       </div>
     </>
   );
+
+  function handlePromoterChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const promoterId = event.currentTarget.value;
+    if (promoterId === independentPromoterId) {
+      setValue("selectedPromoterId", independentPromoterId, { shouldDirty: true });
+      setValue("selectedPromotionName", independentPromotionName, { shouldDirty: true });
+      return;
+    }
+    const promoter = promoters.find((option) => option.id === promoterId);
+    if (!promoter) return;
+    setValue("selectedPromoterId", promoter.id, { shouldDirty: true });
+    setValue("selectedPromotionName", promoter.promotionName, { shouldDirty: true });
+  }
 }
 
 function ReviewBlock({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit: () => void }) {

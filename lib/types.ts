@@ -1,3 +1,5 @@
+import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
+
 export type YesNo = "" | "yes" | "no";
 
 export type UploadKey =
@@ -104,6 +106,8 @@ export type ApplicationData = {
   pendingLawCharges: YesNo;
   pendingLawChargesList: PendingLawCharge[];
   uploads: Partial<Record<UploadKey, string>>;
+  selectedPromoterId: string;
+  selectedPromotionName: string;
   certifyTrue: boolean;
   certifyConsequences: boolean;
   certifyHelperOnly: boolean;
@@ -200,6 +204,8 @@ export const defaultApplicationData: ApplicationData = {
   pendingLawCharges: "no",
   pendingLawChargesList: [],
   uploads: {},
+  selectedPromoterId: independentPromoterId,
+  selectedPromotionName: independentPromotionName,
   certifyTrue: false,
   certifyConsequences: false,
   certifyHelperOnly: false,
