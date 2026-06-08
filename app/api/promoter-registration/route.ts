@@ -29,11 +29,11 @@ export async function POST(request: Request) {
     const supabase = createSupabaseServiceRoleClient();
     const { error } = await supabase.from("promoters").insert({
       promotion_name: registration.promotionName,
-      promoter_license_number: registration.licenseNumber,
-      promoter_email: registration.promoterEmail,
+      license_number: registration.licenseNumber,
+      email: registration.promoterEmail,
       contact_name: registration.contactName,
       phone: registration.phone,
-      website_url: registration.websiteUrl,
+      website_or_social: registration.websiteUrl,
       status: "pending",
       created_at: new Date().toISOString()
     });

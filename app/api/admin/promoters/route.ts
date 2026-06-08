@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServiceRoleClient();
     const { data, error } = await supabase
       .from("promoters")
-      .select("id, promotion_name, promoter_license_number, promoter_email, contact_name, phone, website_url, status, created_at")
+      .select("id, promotion_name, license_number, email, contact_name, phone, website_or_social, status, created_at")
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
@@ -22,11 +22,11 @@ export async function GET(request: NextRequest) {
       promoters: (data || []).map((promoter) => ({
         id: promoter.id,
         promotionName: promoter.promotion_name,
-        licenseNumber: promoter.promoter_license_number,
-        promoterEmail: promoter.promoter_email,
+        licenseNumber: promoter.license_number,
+        promoterEmail: promoter.email,
         contactName: promoter.contact_name,
         phone: promoter.phone,
-        websiteUrl: promoter.website_url,
+        websiteUrl: promoter.website_or_social,
         status: promoter.status,
         createdAt: promoter.created_at
       }))

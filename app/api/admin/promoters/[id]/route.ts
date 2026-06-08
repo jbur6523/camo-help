@@ -42,8 +42,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { error: updateError } = await supabase
       .from("promoters")
       .update({
-        status: nextStatus,
-        approved_at: nextStatus === "active" ? new Date().toISOString() : null
+        status: nextStatus
       })
       .eq("id", params.id);
 

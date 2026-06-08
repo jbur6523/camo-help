@@ -155,7 +155,7 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error } = await supabase
       .from("promoters")
-      .select("id, promotion_name, promoter_email, status")
+      .select("id, promotion_name, email, status")
       .eq("id", selectedPromoterId)
       .eq("status", "active")
       .maybeSingle();
@@ -165,14 +165,14 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       return null;
     }
 
-    if (!promoter || promoter.status !== "active" || !promoter.promoter_email) {
+    if (!promoter || promoter.status !== "active" || !promoter.email) {
       console.warn(`Promoter notification skipped: selected promoter is not active (${selectedPromoterId}).`);
       return null;
     }
 
     const { error: emailError } = await resend.emails.send({
       from,
-      to: promoter.promoter_email,
+      to: promoter.email,
       subject: `New Fighter Submission - ${fullName(application)}`,
       text: buildPromoterNotificationBody(application, new Date())
     });
@@ -182,7 +182,7 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       return null;
     }
 
-    return promoter.promoter_email as string;
+    return promoter.email as string;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown promoter notification error.";
     console.warn(`Promoter notification skipped: ${message}`);
