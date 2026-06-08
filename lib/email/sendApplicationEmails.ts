@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
+import { independentPromoterId } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
 
@@ -73,8 +73,7 @@ export function buildSubmissionEmailMessages(
   payload: SubmissionEmailPayload,
   {
     applicationRecipient,
-    medicalRecipient,
-    betaMode
+    medicalRecipient
   }: {
     applicationRecipient: string;
     medicalRecipient: string;
@@ -100,8 +99,8 @@ export function buildSubmissionEmailMessages(
     messages.push({
       kind: "application",
       to: applicationRecipient,
-      subject: `CAMO Application Documents - ${name}`,
-      text: buildApplicationEmailBody(payload.application, betaMode),
+      subject: `Submission: ${name} - ${formatEmailDate(new Date())}`,
+      text: buildApplicationEmailBody(payload.application, applicationAttachments),
       attachments: applicationAttachments
     });
   }
@@ -110,8 +109,8 @@ export function buildSubmissionEmailMessages(
     messages.push({
       kind: "medical",
       to: medicalRecipient,
-      subject: `CAMO Medical Documents - ${name}`,
-      text: buildMedicalEmailBody(payload.application, betaMode),
+      subject: buildMedicalEmailSubject(name, payload.uploads),
+      text: buildMedicalEmailBody(payload.application, payload.uploads),
       attachments: medicalAttachments
     });
   }
@@ -190,33 +189,31 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
   }
 }
 
-function buildApplicationEmailBody(application: ApplicationData, betaMode: boolean) {
+function buildApplicationEmailBody(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
   return [
-    `Applicant name: ${fullName(application)}`,
-    `Date of birth: ${application.birthDate}`,
+    complianceContactLine(application.email),
+    "",
+    `Applicant: ${fullName(application)}`,
     `Email: ${application.email}`,
-    `Phone: ${application.phone}`,
-    `Selected promotion: ${selectedPromotionName(application)}`,
-    `Requirements selected for submission: ${selectedRequirementLabels(application)}`,
+    `DOB: ${application.birthDate}`,
     "",
-    "Attached are the selected CAMO application documents and identification documents.",
+    "Requirements Submitted:",
     "",
-    routingNote(betaMode)
+    ...applicationRequirementLines(application, applicationAttachments)
   ].join("\n");
 }
 
-function buildMedicalEmailBody(application: ApplicationData, betaMode: boolean) {
+function buildMedicalEmailBody(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
   return [
-    `Applicant name: ${fullName(application)}`,
-    `Date of birth: ${application.birthDate}`,
+    complianceContactLine(application.email),
+    "",
+    `Applicant: ${fullName(application)}`,
     `Email: ${application.email}`,
-    `Phone: ${application.phone}`,
-    `Selected promotion: ${selectedPromotionName(application)}`,
-    `Requirements selected for submission: ${selectedRequirementLabels(application)}`,
+    `DOB: ${application.birthDate}`,
     "",
-    "Attached are the selected medical documents.",
+    "Requirements Submitted:",
     "",
-    routingNote(betaMode)
+    ...medicalRequirementLines(uploads)
   ].join("\n");
 }
 
@@ -237,14 +234,46 @@ function selectedRequirementLabels(application: ApplicationData) {
   return (application.requirementsNeeded || []).map((key) => requirementLabels[key]).join(", ") || "None";
 }
 
-function selectedPromotionName(application: ApplicationData) {
-  return application.selectedPromotionName || independentPromotionName;
+function complianceContactLine(fighterEmail: string) {
+  return `This is being submitted by a third-party service. For issues of non-compliance, please reply all to this email or contact the fighter directly at ${fighterEmail}.`;
 }
 
-function routingNote(betaMode: boolean) {
-  return betaMode
-    ? "Routing note: This submission was sent using beta/testing routing."
-    : "Routing note: Production recipient routing was used.";
+function applicationRequirementLines(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
+  const requirementsNeeded = application.requirementsNeeded || [];
+  const lines = [
+    ...(requirementsNeeded.includes("athleteLicenseApplication") ? ["* Athlete License Application"] : []),
+    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["* National MMA ID Application"] : [])
+  ];
+
+  if (lines.length) return lines;
+  return applicationAttachments.map((attachment) => `* ${attachment.filename}`);
+}
+
+function buildMedicalEmailSubject(name: string, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
+  const hasBloodwork = Boolean(uploads.bloodwork?.length);
+  const hasPhysical = Boolean(uploads.physical?.length);
+
+  if (hasBloodwork && hasPhysical) return `Submission: ${name} - Blood Work & Physical Exam`;
+  if (hasBloodwork) return `Submission: ${name} - Blood Work`;
+  if (hasPhysical) return `Submission: ${name} - Physical Exam`;
+  return `Submission: ${name} - Medical Documents`;
+}
+
+function medicalRequirementLines(uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
+  return [
+    ...(uploads.bloodwork?.length ? ["* Blood Work"] : []),
+    ...(uploads.physical?.length ? ["* Physical Exam"] : []),
+    ...(uploads.cardio?.length ? ["* Cardio/EKG"] : [])
+  ];
+}
+
+function formatEmailDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Los_Angeles"
+  }).format(date);
 }
 
 function requiredEnv(name: string) {
