@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { independentPromotionName } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
 
@@ -148,6 +149,7 @@ function buildApplicationEmailBody(application: ApplicationData, betaMode: boole
     `Date of birth: ${application.birthDate}`,
     `Email: ${application.email}`,
     `Phone: ${application.phone}`,
+    `Selected promotion: ${selectedPromotionName(application)}`,
     `Requirements selected for submission: ${selectedRequirementLabels(application)}`,
     "",
     "Attached are the selected CAMO application documents and identification documents.",
@@ -162,6 +164,7 @@ function buildMedicalEmailBody(application: ApplicationData, betaMode: boolean) 
     `Date of birth: ${application.birthDate}`,
     `Email: ${application.email}`,
     `Phone: ${application.phone}`,
+    `Selected promotion: ${selectedPromotionName(application)}`,
     `Requirements selected for submission: ${selectedRequirementLabels(application)}`,
     "",
     "Attached are the selected medical documents.",
@@ -172,6 +175,10 @@ function buildMedicalEmailBody(application: ApplicationData, betaMode: boolean) 
 
 function selectedRequirementLabels(application: ApplicationData) {
   return (application.requirementsNeeded || []).map((key) => requirementLabels[key]).join(", ") || "None";
+}
+
+function selectedPromotionName(application: ApplicationData) {
+  return application.selectedPromotionName || independentPromotionName;
 }
 
 function routingNote(betaMode: boolean) {
