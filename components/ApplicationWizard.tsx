@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { StepRequirementsNeeded } from "@/components/StepRequirementsNeeded";
 import { StepApplicantInfo } from "@/components/StepApplicantInfo";
@@ -88,6 +88,7 @@ export function ApplicationWizard() {
   const [pdfs, setPdfs] = useState<GeneratedPdfs | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
+  const submissionInFlightRef = useRef(false);
 
   const form = useForm<ApplicationData>({
     mode: "onBlur",
@@ -411,8 +412,8 @@ export function ApplicationWizard() {
     return false;
   }
 
-  async function generatePdfs() {
-    setIsBusy(true);
+  async function generatePdfs({ manageBusy = true }: { manageBusy?: boolean } = {}) {
+    if (manageBusy) setIsBusy(true);
     setGlobalError("");
     try {
       const values = form.getValues();
@@ -449,23 +450,39 @@ export function ApplicationWizard() {
       setGlobalError(error instanceof Error ? error.message : "Could not generate PDFs.");
       return null;
     } finally {
-      setIsBusy(false);
+      if (manageBusy) setIsBusy(false);
     }
   }
 
   async function submitDocuments() {
+    if (submissionInFlightRef.current) {
+      console.info("Submission ignored because one is already in progress.", { isBusy });
+      return;
+    }
+
+    const submissionId = createSubmissionId();
+    submissionInFlightRef.current = true;
+    setIsBusy(true);
+    setGlobalError("");
+    console.info("Frontend submission started.", {
+      submissionId,
+      submitButtonDisabled: true
+    });
+
     if (!(await validateStep("review"))) {
+      console.info("Frontend submission stopped during review validation.", { submissionId });
+      submissionInFlightRef.current = false;
+      setIsBusy(false);
       setStep("review");
       return;
     }
 
-    setIsBusy(true);
-    setGlobalError("");
     try {
-      const generated = pdfs || (await generatePdfs());
+      const generated = pdfs || (await generatePdfs({ manageBusy: false }));
       if (!generated) throw new Error("Generate the PDFs before submitting.");
       const values = form.getValues();
       const formData = new FormData();
+      formData.append("submissionId", submissionId);
       formData.append("application", JSON.stringify(values));
       if (generated.athleteBlob) {
         formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
@@ -489,6 +506,7 @@ export function ApplicationWizard() {
       setGlobalError(error instanceof Error ? error.message : "Submission failed.");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
+      submissionInFlightRef.current = false;
       setIsBusy(false);
     }
   }
@@ -582,6 +600,13 @@ function isValidAge(age: string) {
 function isValidHeightInches(heightInches: string) {
   const value = Number(heightInches);
   return Number.isInteger(value) && value >= 0 && value <= 12;
+}
+
+function createSubmissionId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {

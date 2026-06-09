@@ -10,6 +10,7 @@ export type EmailAttachment = {
 };
 
 export type SubmissionEmailPayload = {
+  submissionId?: string;
   application: ApplicationData;
   athletePdf?: EmailAttachment;
   nationalIdPdf?: EmailAttachment;
@@ -34,6 +35,8 @@ export class NoSelectedEmailAttachmentsError extends Error {
 }
 
 export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
+  const submissionId = payload.submissionId || "unknown";
+  console.info("sendApplicationEmails started.", { submissionId });
   const betaMode = process.env.BETA_MODE !== "false";
   const hasSelectedAttachments = buildSubmissionEmailMessages(payload, {
     applicationRecipient: "",
@@ -52,24 +55,37 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     medicalRecipient,
     betaMode
   });
+  const resendMessageIds: Partial<Record<SubmissionEmailMessage["kind"], string | null>> = {};
 
   for (const [index, message] of messages.entries()) {
     if (index > 0) await delay(submissionEmailSendDelayMs);
-    await sendResendEmail(resend, {
+    console.info("Submission email send attempted.", {
+      submissionId,
+      kind: message.kind,
+      attachmentCount: message.attachments.length
+    });
+    const resendMessageId = await sendResendEmail(resend, {
       from,
       to: message.to,
       subject: message.subject,
       text: message.text,
       attachments: message.attachments
     });
+    resendMessageIds[message.kind] = resendMessageId;
+    console.info("Submission email send completed.", {
+      submissionId,
+      kind: message.kind,
+      resendMessageId
+    });
   }
 
-  const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application);
+  const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application, submissionId);
 
   return {
     applicationRecipient: messages.some((message) => message.kind === "application") ? applicationRecipient : null,
     medicalRecipient: messages.some((message) => message.kind === "medical") ? medicalRecipient : null,
     promoterRecipient,
+    resendMessageIds,
     betaMode
   };
 }
@@ -137,7 +153,7 @@ async function sendResendEmail(
     attachments: EmailAttachment[];
   }
 ) {
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: email.from,
     to: email.to,
     subject: email.subject,
@@ -152,13 +168,15 @@ async function sendResendEmail(
   if (error) {
     throw new Error(`Resend email failed: ${error.message}`);
   }
+
+  return data?.id || null;
 }
 
 function delay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function sendPromoterNotificationEmail(resend: Resend, from: string, application: ApplicationData) {
+async function sendPromoterNotificationEmail(resend: Resend, from: string, application: ApplicationData, submissionId: string) {
   const selectedPromoterId = application.selectedPromoterId;
   if (!selectedPromoterId || selectedPromoterId === independentPromoterId) return null;
 
@@ -182,7 +200,8 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       return null;
     }
 
-    const { error: emailError } = await resend.emails.send({
+    console.info("Promoter notification send attempted.", { submissionId });
+    const { data, error: emailError } = await resend.emails.send({
       from,
       to: promoter.email,
       subject: `New Fighter Submission - ${fullName(application)}`,
@@ -194,6 +213,7 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       return null;
     }
 
+    console.info("Promoter notification send completed.", { submissionId, resendMessageId: data?.id || null });
     return promoter.email as string;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown promoter notification error.";
