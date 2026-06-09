@@ -5,15 +5,13 @@ export function WizardBottomNav({
   isFirstStep,
   isLastStep,
   onBack,
-  onNext,
-  onSubmit
+  onNext
 }: {
   isBusy: boolean;
   isFirstStep: boolean;
   isLastStep: boolean;
   onBack: () => void;
   onNext: () => void;
-  onSubmit: () => void;
 }) {
   const nextLabel = isBusy ? "Working..." : "Next";
 
@@ -23,14 +21,11 @@ export function WizardBottomNav({
         <button className="button secondary" type="button" onClick={onBack} disabled={isFirstStep || isBusy}>
           Back
         </button>
-        <button
-          className="button primary"
-          type="button"
-          onClick={isLastStep ? onSubmit : onNext}
-          disabled={isBusy}
-        >
-          {nextLabel}
-        </button>
+        {isLastStep ? null : (
+          <button className="button primary" type="button" onClick={onNext} disabled={isBusy}>
+            {nextLabel}
+          </button>
+        )}
       </div>
     </nav>
   );

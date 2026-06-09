@@ -63,7 +63,7 @@ const stepLabels: Record<StepId, string> = {
   legal: "Legal",
   uploads: "Uploads",
   review: "Review",
-  generate: "Generate PDFs"
+  generate: "Submit Documents"
 };
 
 type GeneratedPdfs = {
@@ -89,6 +89,8 @@ export function ApplicationWizard() {
   const [submitted, setSubmitted] = useState(false);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
   const submissionInFlightRef = useRef(false);
+  const autoPdfGenerationInFlightRef = useRef(false);
+  const autoPdfGeneratedForCurrentVisitRef = useRef(false);
 
   const form = useForm<ApplicationData>({
     mode: "onBlur",
@@ -121,6 +123,21 @@ export function ApplicationWizard() {
     });
     return () => subscription.unsubscribe();
   }, [watch]);
+
+  useEffect(() => {
+    if (step !== "generate") {
+      autoPdfGeneratedForCurrentVisitRef.current = false;
+      return;
+    }
+
+    if (documentsOnly || autoPdfGeneratedForCurrentVisitRef.current || autoPdfGenerationInFlightRef.current) return;
+
+    autoPdfGeneratedForCurrentVisitRef.current = true;
+    autoPdfGenerationInFlightRef.current = true;
+    void generatePdfs().finally(() => {
+      autoPdfGenerationInFlightRef.current = false;
+    });
+  }, [step, documentsOnly]);
 
   useEffect(() => {
     const formattedBirthDate = formatBirthDateInput(data.birthDate);
@@ -228,9 +245,7 @@ export function ApplicationWizard() {
           <GenerateStep
             pdfs={pdfs}
             isBusy={isBusy}
-            onGenerate={generatePdfs}
             onSubmit={submitDocuments}
-            paymentConfigured={Boolean(process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL)}
             documentsOnly={documentsOnly}
           />
         ) : null}
@@ -242,7 +257,6 @@ export function ApplicationWizard() {
         isLastStep={activeStepIndex === activeSteps.length - 1}
         onBack={goBack}
         onNext={goNext}
-        onSubmit={submitDocuments}
       />
     </main>
   );
@@ -515,69 +529,39 @@ export function ApplicationWizard() {
 function GenerateStep({
   pdfs,
   isBusy,
-  onGenerate,
   onSubmit,
-  paymentConfigured,
   documentsOnly
 }: {
   pdfs: GeneratedPdfs | null;
   isBusy: boolean;
-  onGenerate: () => Promise<GeneratedPdfs | null>;
   onSubmit: () => Promise<void>;
-  paymentConfigured: boolean;
   documentsOnly: boolean;
 }) {
   return (
     <>
-      <h2 className="step-title">{documentsOnly ? "Submit Documents" : "Generate PDFs"}</h2>
+      <h2 className="step-title">Submit Documents</h2>
       <p className="step-help">
         {documentsOnly
-          ? "Send the selected documents to CAMO."
-          : "Create the completed CAMO PDFs, preview or download them, then submit documents by email."}
+          ? "Submit your selected documents by email."
+          : "Download your completed forms if you want a copy, then submit your documents by email."}
       </p>
       <div className="field-grid">
-        {documentsOnly ? null : (
-          <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
-            {isBusy ? "Generating..." : "Generate Completed PDFs"}
-          </button>
-        )}
         {pdfs ? (
           <div className="download-list">
             {pdfs.athleteUrl ? (
-              <>
-                <a href={pdfs.athleteUrl} target="_blank" rel="noreferrer">
-                  Preview Athlete License PDF
-                </a>
-                <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
-                  Download Athlete License PDF
-                </a>
-              </>
+              <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
+                Download Athlete License PDF
+              </a>
             ) : null}
             {pdfs.nationalUrl ? (
-              <>
-                <a href={pdfs.nationalUrl} target="_blank" rel="noreferrer">
-                  Preview National MMA ID PDF
-                </a>
-                <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
-                  Download National MMA ID PDF
-                </a>
-              </>
+              <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
+                Download National MMA ID PDF
+              </a>
             ) : null}
-          </div>
-        ) : null}
-        <div className="notice">
-          {documentsOnly
-            ? "Selected documents will be sent to the configured beta or production recipients."
-            : "Emails will be sent to the configured beta or production recipients. Payment is not collected in this app."}
-        </div>
-        {!documentsOnly && !paymentConfigured ? (
-          <div className="notice">
-            <strong>Payment link has not been configured yet.</strong> Add the official CAMO payment URL as
-            NEXT_PUBLIC_CAMO_PAYMENT_URL before using the Pay Now button in production.
           </div>
         ) : null}
         <button className="button primary" type="button" onClick={onSubmit} disabled={isBusy}>
-          {isBusy ? "Submitting..." : "Submit Documents"}
+          {isBusy ? "Working..." : "Submit Documents"}
         </button>
       </div>
     </>
