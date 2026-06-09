@@ -71,13 +71,13 @@ Application documents, headshot, photo ID, and any additional documents are sent
 
 ## Payment URL
 
-Set the official CAMO payment URL with:
+The app links fighters to the official CAMO athlete payment page:
 
-```env
-NEXT_PUBLIC_CAMO_PAYMENT_URL=
+```text
+https://camo-mma.myshopify.com/collections/athletes
 ```
 
-If it is blank, the app shows: "Payment link has not been configured yet. Please add the official CAMO payment URL in the environment settings."
+Payment remains outside this app. Document submission still works normally without collecting payment.
 
 ## Upload Privacy
 
@@ -89,8 +89,7 @@ Typed form progress is saved in browser local storage. Uploaded files are kept i
 2. Import the project in Vercel.
 3. Add the environment variables from `.env.example`.
 4. Set `BETA_MODE=true` for beta testing, or `BETA_MODE=false` for production routing.
-5. Add the official `NEXT_PUBLIC_CAMO_PAYMENT_URL`.
-6. Deploy.
+5. Deploy.
 
 Because PDF templates are in `public/templates`, Vercel will serve them with the app.
 
@@ -101,6 +100,5 @@ After importing the GitHub project into Vercel:
 1. Confirm the deployment URL loads.
 2. Keep `BETA_MODE=true`.
 3. Add `RESEND_API_KEY`, `EMAIL_FROM`, `LICENSE_EMAIL_TO`, and `MEDICAL_EMAIL_TO` in Vercel Project Settings.
-4. Leave `NEXT_PUBLIC_CAMO_PAYMENT_URL` blank until the official payment URL is confirmed.
-5. Check `/api/config-status`; it returns booleans for beta mode, email configuration, and payment-link configuration without exposing secrets.
-6. Submit one test application with harmless test files before sharing the beta link.
+4. Check `/api/config-status`; it returns booleans for beta mode and email configuration without exposing secrets.
+5. Submit one test application with harmless test files before sharing the beta link.

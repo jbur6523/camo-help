@@ -13,7 +13,6 @@ export function GET() {
 
   return NextResponse.json({
     betaMode,
-    paymentConfigured: Boolean(process.env.NEXT_PUBLIC_CAMO_PAYMENT_URL),
     emailConfigured
   });
 }

@@ -75,7 +75,6 @@ type GeneratedPdfs = {
 
 type ConfigStatus = {
   betaMode: boolean;
-  paymentConfigured: boolean;
   emailConfigured: boolean;
 };
 
