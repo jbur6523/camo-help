@@ -197,12 +197,6 @@ export function ApplicationWizard() {
               <li>Generate your completed PDFs.</li>
               <li>Submit documents and finish payment through CAMO.</li>
             </ul>
-            {configStatus ? (
-              <div className="config-strip" aria-label="Deployment configuration status">
-                <span>{configStatus.emailConfigured ? "Email ready" : "Email not configured"}</span>
-                <span>{configStatus.paymentConfigured ? "Payment link ready" : "Payment link pending"}</span>
-              </div>
-            ) : null}
           </div>
           <div className="landing-actions">
             <button className="button primary" type="button" onClick={() => setStarted(true)}>

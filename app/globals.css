@@ -441,9 +441,37 @@ textarea {
   max-width: 100%;
 }
 
-.upload-tile input {
-  margin-top: 10px;
+.upload-file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  width: fit-content;
   max-width: 100%;
+  margin-top: 10px;
+  border: 1px solid #9bcbb6;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: var(--brand-dark);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.upload-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.upload-file-input:focus-visible + .upload-file-picker {
+  outline: 3px solid rgba(22, 99, 79, 0.24);
+  outline-offset: 2px;
 }
 
 .upload-file-list {
@@ -686,23 +714,6 @@ textarea {
   color: var(--brand-dark);
   font-weight: 900;
   overflow-wrap: anywhere;
-}
-
-.config-strip {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.config-strip span {
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfb;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .review-header {

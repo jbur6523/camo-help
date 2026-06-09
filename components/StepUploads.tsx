@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import type { ApplicationData, UploadKey, UploadedFiles } from "@/lib/types";
 import { defaultApplicationData, uploadLabels } from "@/lib/types";
@@ -115,6 +116,9 @@ function UploadTile({
   onFileRemove: (key: UploadKey, index: number) => void;
   children?: React.ReactNode;
 }) {
+  const inputId = useId();
+  const filePickerLabel = files.length ? (multiple ? "Add additional file" : "Replace file") : "Choose file";
+
   return (
     <div className="upload-tile">
       <span className="field-label">
@@ -122,6 +126,8 @@ function UploadTile({
       </span>
       {children ? <small>{children}</small> : null}
       <input
+        id={inputId}
+        className="upload-file-input"
         type="file"
         accept={acceptedTypes}
         multiple={multiple}
@@ -133,6 +139,9 @@ function UploadTile({
           event.currentTarget.value = "";
         }}
       />
+      <label className="upload-file-picker" htmlFor={inputId}>
+        {filePickerLabel}
+      </label>
       {files.length ? (
         <ul className="upload-file-list">
           {files.map((file, index) => (
