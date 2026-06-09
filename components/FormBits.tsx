@@ -17,6 +17,8 @@ export function Field({
   inputMode,
   readOnly = false,
   maxLength,
+  min,
+  max,
   onChange
 }: {
   label: string;
@@ -30,6 +32,8 @@ export function Field({
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   readOnly?: boolean;
   maxLength?: number;
+  min?: number;
+  max?: number;
   onChange?: React.ChangeEventHandler<HTMLInputElement>;
 }) {
   const message = getError(errors, name);
@@ -43,6 +47,8 @@ export function Field({
         inputMode={inputMode}
         readOnly={readOnly}
         maxLength={maxLength}
+        min={min}
+        max={max}
         {...register(name as never, {
           required: required ? (typeof required === "string" ? required : `${label} is required.`) : false,
           onChange

@@ -24,6 +24,8 @@ type SubmissionEmailMessage = {
   attachments: EmailAttachment[];
 };
 
+const submissionEmailSendDelayMs = 2000;
+
 export class NoSelectedEmailAttachmentsError extends Error {
   constructor() {
     super("No selected requirements have valid attachments to send.");
@@ -51,13 +53,16 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     betaMode
   });
 
-  await Promise.all(messages.map((message) => sendResendEmail(resend, {
-    from,
-    to: message.to,
-    subject: message.subject,
-    text: message.text,
-    attachments: message.attachments
-  })));
+  for (const [index, message] of messages.entries()) {
+    if (index > 0) await delay(submissionEmailSendDelayMs);
+    await sendResendEmail(resend, {
+      from,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      attachments: message.attachments
+    });
+  }
 
   const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application);
 
@@ -88,10 +93,14 @@ export function buildSubmissionEmailMessages(
     ...(requirementsNeeded.includes("headshot") ? payload.uploads.headshot || [] : []),
     ...(requirementsNeeded.includes("photoId") ? payload.uploads.photoId || [] : [])
   ];
-  const medicalAttachments = [
-    ...(requirementsNeeded.includes("bloodwork") ? payload.uploads.bloodwork || [] : []),
-    ...(requirementsNeeded.includes("physical") ? payload.uploads.physical || [] : []),
+  const uploadedMedicalAttachments = [
+    ...(payload.uploads.bloodwork || []),
+    ...(payload.uploads.physical || []),
     ...(payload.uploads.cardio || [])
+  ];
+  const medicalAttachments = [
+    ...uploadedMedicalAttachments,
+    ...(uploadedMedicalAttachments.length ? payload.uploads.additional || [] : [])
   ];
   const messages: SubmissionEmailMessage[] = [];
 
@@ -143,6 +152,10 @@ async function sendResendEmail(
   if (error) {
     throw new Error(`Resend email failed: ${error.message}`);
   }
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function sendPromoterNotificationEmail(resend: Resend, from: string, application: ApplicationData) {
@@ -263,7 +276,8 @@ function medicalRequirementLines(uploads: Partial<Record<UploadKey, EmailAttachm
   return [
     ...(uploads.bloodwork?.length ? ["* Blood Work"] : []),
     ...(uploads.physical?.length ? ["* Physical Exam"] : []),
-    ...(uploads.cardio?.length ? ["* Cardio/EKG"] : [])
+    ...(uploads.cardio?.length ? ["* Cardio/EKG"] : []),
+    ...(uploads.additional?.length ? ["* Additional Documentation"] : [])
   ];
 }
 

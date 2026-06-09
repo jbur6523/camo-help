@@ -318,11 +318,11 @@ export function ApplicationWizard() {
                 "signatureDate"
               ]
           : [];
-    const needsMedicalAcknowledgement =
-      currentStep === "review" &&
-      ((values.requirementsNeeded || []).includes("bloodwork") || (values.requirementsNeeded || []).includes("physical"));
-    if (needsMedicalAcknowledgement) {
-      requireFields.push("certifyMedicalRequirements");
+    if (currentStep === "review" && (values.requirementsNeeded || []).includes("bloodwork")) {
+      requireFields.push("certifyBloodworkRequirements");
+    }
+    if (currentStep === "review" && (values.requirementsNeeded || []).includes("physical")) {
+      requireFields.push("certifyPhysicalRequirements");
     }
 
     if (requireFields.length && !(await form.trigger(requireFields))) {
@@ -340,6 +340,7 @@ export function ApplicationWizard() {
       if (!/^\S+@\S+\.\S+$/.test(values.email)) return fail("Enter a valid email address.");
       if (!documentsOnly && /p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
       if (!documentsOnly && !/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
+      if (!documentsOnly && !isValidHeightInches(values.heightInches)) return fail("Height inches must be between 0 and 12.");
     }
 
     if (currentStep === "fighterHistory") {
@@ -576,6 +577,11 @@ function toArrayBuffer(bytes: Uint8Array) {
 function isValidAge(age: string) {
   const value = Number(age);
   return Number.isInteger(value) && value >= 0 && value < 120;
+}
+
+function isValidHeightInches(heightInches: string) {
+  const value = Number(heightInches);
+  return Number.isInteger(value) && value >= 0 && value <= 12;
 }
 
 function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {

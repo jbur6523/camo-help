@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
-import { physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
+import { bloodTestRequirements, physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
 import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
 import { fullName, paymentTotal, requirementLabels, requirementOptions, uploadLabels } from "@/lib/types";
@@ -32,7 +32,8 @@ export function StepReview({
   const requirementsNeeded = data.requirementsNeeded || [];
   const submittingNow = requirementOptions.filter((key) => requirementsNeeded.includes(key));
   const alreadyCompleted = requirementOptions.filter((key) => !requirementsNeeded.includes(key));
-  const needsMedicalAcknowledgement = requirementsNeeded.includes("bloodwork") || requirementsNeeded.includes("physical");
+  const needsBloodworkAcknowledgement = requirementsNeeded.includes("bloodwork");
+  const needsPhysicalAcknowledgement = requirementsNeeded.includes("physical");
   const selectedPromoterId = data.selectedPromoterId || independentPromoterId;
   const selectedPromotionName = data.selectedPromotionName || independentPromotionName;
 
@@ -189,20 +190,34 @@ export function StepReview({
               ) : null}
             </>
           )}
-          {needsMedicalAcknowledgement ? (
+          {needsPhysicalAcknowledgement ? (
             <>
               <label className="checkbox-line">
                 <input
                   type="checkbox"
-                  {...register("certifyMedicalRequirements", { required: "Medical requirements acknowledgement is required." })}
+                  {...register("certifyPhysicalRequirements", { required: "Physical acknowledgement is required." })}
+                />
+                <span>{physicalMdDoAcknowledgement}</span>
+              </label>
+              {formState.errors.certifyPhysicalRequirements ? (
+                <div className="error">Physical acknowledgement is required.</div>
+              ) : null}
+            </>
+          ) : null}
+          {needsBloodworkAcknowledgement ? (
+            <>
+              <label className="checkbox-line">
+                <input
+                  type="checkbox"
+                  {...register("certifyBloodworkRequirements", { required: "Blood work acknowledgement is required." })}
                 />
                 <span>
-                  {physicalMdDoAcknowledgement} I acknowledge the blood test must include HIV 4th Generation, Hepatitis C Antibody, and
-                  Hepatitis B <strong>Surface Antigen</strong>.
+                  I acknowledge the blood test must include {bloodTestRequirements[0]}, {bloodTestRequirements[1]}, and{" "}
+                  {bloodTestRequirements[2]} <strong>Surface Antigen</strong>.
                 </span>
               </label>
-              {formState.errors.certifyMedicalRequirements ? (
-                <div className="error">Medical requirements acknowledgement is required.</div>
+              {formState.errors.certifyBloodworkRequirements ? (
+                <div className="error">Blood work acknowledgement is required.</div>
               ) : null}
             </>
           ) : null}

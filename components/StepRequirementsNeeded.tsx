@@ -24,7 +24,7 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
         {requirementOptions.map((key) => (
           <label className="checkbox-line" key={key}>
             <input type="checkbox" value={key} {...register("requirementsNeeded")} />
-            {requirementLabels[key]}
+            {requirementLabel(key)}
           </label>
         ))}
         {!selected.length || formState.errors.requirementsNeeded ? (
@@ -62,4 +62,10 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
       ) : null}
     </>
   );
+}
+
+function requirementLabel(key: (typeof requirementOptions)[number]) {
+  if (key === "bloodwork") return "Blood Work (HIV 4th Gen, Hep C Antibody, Hep B SURFACE ANTIGEN)";
+  if (key === "physical") return "Physical (MUST BE DONE BY MD/DO)";
+  return requirementLabels[key];
 }

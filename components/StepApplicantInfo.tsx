@@ -69,10 +69,26 @@ export function StepApplicantInfo({ form, short = false }: { form: UseFormReturn
               errors={formState.errors}
               required
               inputMode="numeric"
+              maxLength={4}
+              onChange={(event) => {
+                const ssnLast4 = event.currentTarget.value.replace(/\D/g, "").slice(0, 4);
+                event.currentTarget.value = ssnLast4;
+                setValue("ssnLast4", ssnLast4, { shouldDirty: true, shouldValidate: true });
+              }}
             />
             <div className="field-grid two-col">
               <Field label="Height feet" name="heightFeet" register={register} errors={formState.errors} required inputMode="numeric" />
-              <Field label="Height inches" name="heightInches" register={register} errors={formState.errors} required inputMode="numeric" />
+              <Field
+                label="Height inches"
+                name="heightInches"
+                register={register}
+                errors={formState.errors}
+                required
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={12}
+              />
             </div>
             <Field label="Weight in pounds" name="weight" register={register} errors={formState.errors} required inputMode="numeric" />
           </>
