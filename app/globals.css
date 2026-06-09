@@ -460,9 +460,9 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid #7fbea4;
   border-radius: 8px;
-  background: #ffffff;
+  background: #dff3ea;
   min-width: 0;
 }
 
@@ -478,11 +478,11 @@ textarea {
 
 .upload-file-list button {
   min-height: 36px;
-  border: 0;
+  border: 1px solid #9bcbb6;
   border-radius: 8px;
   padding: 0 10px;
-  background: #e8ecea;
-  color: var(--ink);
+  background: #ffffff;
+  color: var(--brand-dark);
   font-size: 12px;
   font-weight: 900;
 }
