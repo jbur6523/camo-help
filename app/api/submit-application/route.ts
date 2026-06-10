@@ -6,6 +6,7 @@ import {
   SubmissionEmailDeliveryError
 } from "@/lib/email/sendApplicationEmails";
 import {
+  safeErrorMessage,
   sendSupportErrorNotification,
   sendSupportFighterSubmissionNotification
 } from "@/lib/email/supportNotifications";
@@ -21,9 +22,24 @@ const uploadKeys: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId",
 const submissionIdTtlMs = 10 * 60 * 1000;
 const processedSubmissionIds = new Map<string, number>();
 
+type DeliveryState = {
+  completedStep: string;
+  applicationEmailSent: boolean;
+  medicalEmailSent: boolean;
+  fighterConfirmationEmailSent: boolean;
+  supportNotificationAttempted: boolean;
+};
+
 export async function POST(request: Request) {
   let submissionId = "unknown";
   let applicationForError: ApplicationData | null = null;
+  const deliveryState: DeliveryState = {
+    completedStep: "request_received",
+    applicationEmailSent: false,
+    medicalEmailSent: false,
+    fighterConfirmationEmailSent: false,
+    supportNotificationAttempted: false
+  };
   try {
     const formData = await request.formData();
     const submittedId = formData.get("submissionId");
@@ -33,7 +49,7 @@ export async function POST(request: Request) {
 
     if (processedSubmissionIds.has(submissionId)) {
       console.warn("Duplicate API submission skipped.", { submissionId });
-      return NextResponse.json({ ok: true, duplicate: true, submissionId });
+      return NextResponse.json({ ok: true, duplicate: true, submissionId, deliveryState });
     }
 
     processedSubmissionIds.set(submissionId, Date.now());
@@ -45,24 +61,27 @@ export async function POST(request: Request) {
 
     const application = JSON.parse(applicationJson) as ApplicationData;
     applicationForError = application;
+    deliveryState.completedStep = "application_payload_parsed";
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
 
     if (requirementsNeeded.includes("athleteLicenseApplication") && !athletePdf) {
-      return NextResponse.json({ error: "Completed Athlete License PDF is missing." }, { status: 400 });
+      return NextResponse.json({ error: "Completed Athlete License PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
     if (requirementsNeeded.includes("nationalMmaIdApplication") && !nationalIdPdf) {
-      return NextResponse.json({ error: "Completed National MMA ID PDF is missing." }, { status: 400 });
+      return NextResponse.json({ error: "Completed National MMA ID PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
     const uploads: Record<string, Awaited<ReturnType<typeof attachmentsFromForm>>> = {};
     for (const key of uploadKeys) {
       uploads[key] = await attachmentsFromForm(formData, key);
     }
+    deliveryState.completedStep = "attachments_parsed";
 
     assertRequiredUploadsPresent(application, uploads);
+    deliveryState.completedStep = "required_uploads_validated";
 
     const submittedAt = new Date();
     const result = await sendApplicationEmails({
@@ -72,32 +91,52 @@ export async function POST(request: Request) {
       nationalIdPdf,
       uploads
     });
+    deliveryState.applicationEmailSent = Boolean(result.applicationRecipient);
+    deliveryState.medicalEmailSent = Boolean(result.medicalRecipient);
+    deliveryState.fighterConfirmationEmailSent = Boolean(result.fighterConfirmationRecipient);
+    deliveryState.completedStep = "critical_camo_emails_sent";
 
-    await sendSupportFighterSubmissionNotification({
-      application,
-      uploads,
-      submittedAt,
-      submissionId,
-      athletePdfGenerated: Boolean(athletePdf),
-      nationalIdPdfGenerated: Boolean(nationalIdPdf),
-      applicationEmailSent: Boolean(result.applicationRecipient),
-      medicalEmailSent: Boolean(result.medicalRecipient),
-      fighterConfirmationEmailSent: Boolean(result.fighterConfirmationRecipient),
-      promoterNotificationStatus: promoterNotificationStatusBeforeSend(application)
-    });
+    try {
+      deliveryState.supportNotificationAttempted = true;
+      await sendSupportFighterSubmissionNotification({
+        application,
+        uploads,
+        submittedAt,
+        submissionId,
+        athletePdfGenerated: Boolean(athletePdf),
+        nationalIdPdfGenerated: Boolean(nationalIdPdf),
+        applicationEmailSent: Boolean(result.applicationRecipient),
+        medicalEmailSent: Boolean(result.medicalRecipient),
+        fighterConfirmationEmailSent: Boolean(result.fighterConfirmationRecipient),
+        promoterNotificationStatus: promoterNotificationStatusBeforeSend(application)
+      });
+    } catch (supportError) {
+      const supportMessage = supportError instanceof Error ? supportError.message : "Support notification failed.";
+      console.warn("Support fighter submission notification failed without blocking submission.", {
+        submissionId,
+        error: safeErrorMessage(supportMessage)
+      });
+    }
 
     const promoterRecipient = await sendPromoterNotificationEmail(application, submissionId);
+    deliveryState.completedStep = "secondary_notifications_attempted";
 
-    return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient });
+    return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient, deliveryState });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
     const isPartial = error instanceof SubmissionEmailDeliveryError && error.sentKinds.length > 0;
+    if (error instanceof SubmissionEmailDeliveryError) {
+      deliveryState.applicationEmailSent = error.sentKinds.includes("application");
+      deliveryState.medicalEmailSent = error.sentKinds.includes("medical");
+      deliveryState.completedStep = error.sentKinds.length ? `${error.sentKinds.join("_and_")}_email_sent` : "critical_email_send_started";
+    }
     console.error("API submission failed.", { submissionId, error: message });
     await sendSupportErrorNotification({
       errorType: classifySubmissionError(message, error),
       source: "app/api/submit-application POST",
       message,
       operation: "Complete fighter document submission",
+      details: deliveryStateDetails(deliveryState),
       submissionId,
       fighterName: applicationForError ? fullName(applicationForError) : undefined,
       fighterEmail: applicationForError?.email,
@@ -109,7 +148,8 @@ export async function POST(request: Request) {
           ? "Some of your documents may not have been delivered successfully."
           : "We were unable to submit your documents at this time.",
         submissionId,
-        failureKind: isPartial ? "partial" : "failed"
+        failureKind: isPartial ? "partial" : "failed",
+        deliveryState
       },
       { status: error instanceof NoSelectedEmailAttachmentsError || error instanceof MissingRequiredUploadsError ? 400 : 500 }
     );
@@ -159,4 +199,14 @@ function classifySubmissionError(message: string, error: unknown) {
 function promoterNotificationStatusBeforeSend(application: ApplicationData) {
   if (!application.selectedPromoterId || application.selectedPromoterId === independentPromoterId) return "not_applicable";
   return "pending";
+}
+
+function deliveryStateDetails(deliveryState: DeliveryState) {
+  return [
+    `Email step completed before failure: ${deliveryState.completedStep}`,
+    `CAMO application email sent: ${deliveryState.applicationEmailSent ? "yes" : "no"}`,
+    `CAMO medical email sent: ${deliveryState.medicalEmailSent ? "yes" : "no"}`,
+    `Fighter confirmation email sent: ${deliveryState.fighterConfirmationEmailSent ? "yes" : "no"}`,
+    `Support notification email attempted: ${deliveryState.supportNotificationAttempted ? "yes" : "no"}`
+  ];
 }

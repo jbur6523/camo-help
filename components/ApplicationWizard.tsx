@@ -85,7 +85,7 @@ type ConfigStatus = {
 type SubmissionFailure = {
   kind: "failed" | "partial";
   submissionId: string;
-  reason?: "large-upload";
+  reason?: "large-upload" | "unexpected-response";
 };
 
 type SubmissionFileSummary = {
@@ -100,10 +100,17 @@ type SubmitApplicationResponse = {
   failureKind?: "failed" | "partial";
   fighterConfirmationRecipient?: string;
   error?: string;
+  deliveryState?: SubmissionDeliveryState;
 };
 
-const maxSingleSubmitFileBytes = 3 * 1024 * 1024;
-const maxTotalSubmitFileBytes = 4 * 1024 * 1024;
+type SubmissionDeliveryState = {
+  completedStep?: string;
+  applicationEmailSent?: boolean;
+  medicalEmailSent?: boolean;
+  fighterConfirmationEmailSent?: boolean;
+  supportNotificationAttempted?: boolean;
+};
+
 const safeResponsePreviewLength = 180;
 
 export function ApplicationWizard() {
@@ -566,32 +573,6 @@ export function ApplicationWizard() {
       });
 
       const outgoingFiles = collectSubmissionFileSummaries(generated, uploadFiles);
-      const sizeProblem = submissionSizeProblem(outgoingFiles);
-      if (sizeProblem) {
-        console.warn("Frontend submission blocked because files are too large.", {
-          submissionId,
-          fileCount: outgoingFiles.length,
-          totalBytes: totalFileBytes(outgoingFiles)
-        });
-        void notifyClientSupportError({
-          submissionId,
-          errorType: "Client Upload Size Guard",
-          source: "components/ApplicationWizard.submitDocuments",
-          message: sizeProblem.supportMessage,
-          operation: "Validate upload size before submit",
-          details: buildClientSubmissionErrorDetails({
-            files: outgoingFiles,
-            responsePreview: "Blocked before request was sent."
-          }),
-          userShownOutcome: "none",
-          fighterName: fullName(form.getValues()),
-          fighterEmail: form.getValues("email")
-        });
-        setGlobalError(sizeProblem.userMessage);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
       const response = await fetch("/api/submit-application", {
         method: "POST",
         body: formData
@@ -611,7 +592,8 @@ export function ApplicationWizard() {
               status: response.status,
               contentType: parsedResponse.contentType,
               responsePreview: parsedResponse.text,
-              files: outgoingFiles
+              files: outgoingFiles,
+              deliveryState: result.deliveryState
             }),
             userShownOutcome: "failure",
             fighterName: fullName(form.getValues()),
@@ -621,7 +603,7 @@ export function ApplicationWizard() {
         setSubmissionFailure({
           kind: result.failureKind === "partial" ? "partial" : "failed",
           submissionId: result.submissionId || submissionId,
-          reason: largeUploadRejection ? "large-upload" : undefined
+          reason: largeUploadRejection ? "large-upload" : !parsedResponse.json ? "unexpected-response" : undefined
         });
         return;
       }
@@ -636,13 +618,14 @@ export function ApplicationWizard() {
             status: response.status,
             contentType: parsedResponse.contentType,
             responsePreview: parsedResponse.text,
-            files: outgoingFiles
+            files: outgoingFiles,
+            deliveryState: result.deliveryState
           }),
           userShownOutcome: "failure",
           fighterName: fullName(form.getValues()),
           fighterEmail: form.getValues("email")
         });
-        setSubmissionFailure({ kind: "failed", submissionId });
+        setSubmissionFailure({ kind: "failed", submissionId, reason: "unexpected-response" });
         return;
       }
       window.localStorage.removeItem(storageKey);
@@ -704,6 +687,7 @@ export function ApplicationWizard() {
 function SubmissionFailurePage({ failure }: { failure: SubmissionFailure }) {
   const isPartial = failure.kind === "partial";
   const isLargeUpload = failure.reason === "large-upload";
+  const isUnexpectedResponse = failure.reason === "unexpected-response";
   return (
     <main className="app-shell">
       <section className="wizard-body submission-failure-page">
@@ -714,6 +698,12 @@ function SubmissionFailurePage({ failure }: { failure: SubmissionFailure }) {
             <>
               <p>One or more uploaded files may be too large to submit.</p>
               <p>Please reduce the file size, retake photos at a lower resolution, or upload smaller PDF/image files, then try again.</p>
+            </>
+          ) : isUnexpectedResponse ? (
+            <>
+              <p>The server rejected the submission before delivery could be confirmed.</p>
+              <p>Please do not submit multiple times.</p>
+              <p>Take a screenshot of this page and contact support@camo-help.com.</p>
             </>
           ) : isPartial ? (
             <>
@@ -868,34 +858,6 @@ function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: U
   return files;
 }
 
-function submissionSizeProblem(files: SubmissionFileSummary[]) {
-  const oversizedFile = files.find((file) => file.size > maxSingleSubmitFileBytes);
-  if (oversizedFile) {
-    return {
-      userMessage: [
-        "One or more files are too large.",
-        `Please upload files smaller than ${formatBytes(maxSingleSubmitFileBytes)} before submitting.`,
-        "Large phone photos can usually be reduced by taking a screenshot of the document/photo or saving it as a smaller PDF."
-      ].join(" "),
-      supportMessage: `File exceeds client submit size limit: ${oversizedFile.field} (${oversizedFile.filename}) is ${oversizedFile.size} bytes.`
-    };
-  }
-
-  const totalBytes = totalFileBytes(files);
-  if (totalBytes > maxTotalSubmitFileBytes) {
-    return {
-      userMessage: [
-        "One or more files are too large.",
-        `Please reduce the combined upload size below ${formatBytes(maxTotalSubmitFileBytes)} before submitting.`,
-        "Large phone photos can usually be reduced by taking a screenshot of the document/photo or saving it as a smaller PDF."
-      ].join(" "),
-      supportMessage: `Combined outgoing file size exceeds client submit size limit: ${totalBytes} bytes.`
-    };
-  }
-
-  return null;
-}
-
 function totalFileBytes(files: SubmissionFileSummary[]) {
   return files.reduce((total, file) => total + file.size, 0);
 }
@@ -906,16 +868,16 @@ async function readSubmitApplicationResponse(response: Response): Promise<{
   contentType: string;
 }> {
   const contentType = response.headers.get("content-type") || "";
+  const text = await response.text().catch(() => "");
   if (contentType.toLowerCase().includes("application/json")) {
     try {
-      return { json: (await response.json()) as SubmitApplicationResponse, text: "", contentType };
+      return { json: JSON.parse(text) as SubmitApplicationResponse, text, contentType };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not parse JSON response.";
-      return { json: null, text: message, contentType };
+      return { json: null, text: text || message, contentType };
     }
   }
 
-  const text = await response.text().catch(() => "");
   return { json: null, text, contentType };
 }
 
@@ -928,20 +890,43 @@ function buildClientSubmissionErrorDetails({
   status,
   contentType,
   responsePreview,
-  files
+  files,
+  deliveryState
 }: {
   status?: number;
   contentType?: string;
   responsePreview?: string;
   files: SubmissionFileSummary[];
+  deliveryState?: SubmissionDeliveryState;
 }) {
   return [
     ...(typeof status === "number" ? [`HTTP status code: ${status}`] : []),
     `Content-Type response header: ${contentType || "Not available"}`,
     `Safe response preview: ${safeResponsePreview(responsePreview || "") || "Not available"}`,
+    ...submissionDeliveryStateDetails(deliveryState),
     `Outgoing file count: ${files.length}`,
     `Outgoing total file size: ${formatBytes(totalFileBytes(files))} (${totalFileBytes(files)} bytes)`,
     ...files.map((file) => `${file.field}: ${file.filename} - ${formatBytes(file.size)} (${file.size} bytes)`)
+  ];
+}
+
+function submissionDeliveryStateDetails(deliveryState?: SubmissionDeliveryState) {
+  if (!deliveryState) {
+    return [
+      "Email step completed before failure: unknown",
+      "CAMO application email sent: unknown",
+      "CAMO medical email sent: unknown",
+      "Fighter confirmation email sent: unknown",
+      "Support notification email attempted: unknown"
+    ];
+  }
+
+  return [
+    `Email step completed before failure: ${deliveryState.completedStep || "unknown"}`,
+    `CAMO application email sent: ${deliveryState.applicationEmailSent ? "yes" : "no"}`,
+    `CAMO medical email sent: ${deliveryState.medicalEmailSent ? "yes" : "no"}`,
+    `Fighter confirmation email sent: ${deliveryState.fighterConfirmationEmailSent ? "yes" : "no"}`,
+    `Support notification email attempted: ${deliveryState.supportNotificationAttempted ? "yes" : "no"}`
   ];
 }
 
