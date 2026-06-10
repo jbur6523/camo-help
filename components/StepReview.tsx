@@ -154,8 +154,9 @@ export function StepReview({
         </div>
 
         <div className="notice">
-          <strong>Privacy notice:</strong> This app will send your application documents and uploaded medical/ID documents to the
-          configured recipients. Do not submit unless you are ready to share these documents for application processing.
+          <strong>Privacy notice:</strong> This app will send your application documents to the intended recipients. Do not submit
+          unless you are ready to share documents for application processing. No record of documents or personal data is stored by
+          camo-help.com.
         </div>
 
         <div className="review-block">

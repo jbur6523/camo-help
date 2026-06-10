@@ -445,6 +445,10 @@ textarea {
   max-width: 100%;
 }
 
+.upload-tile small {
+  display: block;
+}
+
 .upload-file-picker {
   display: inline-flex;
   align-items: center;
