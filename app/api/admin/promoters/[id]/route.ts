@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Resend } from "resend";
 import { isAdminRequestAuthenticated } from "@/lib/admin/auth";
+import {
+  sendSupportErrorNotification,
+  sendSupportPromoterStatusChangeNotification
+} from "@/lib/email/supportNotifications";
 import { nextPromoterStatus, type PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { PromoterStatus } from "@/lib/supabase/database.types";
@@ -28,11 +32,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error: fetchError } = await supabase
       .from("promoters")
-      .select("id, status, email, promotion_name")
+      .select("id, status, email, promotion_name, contact_name")
       .eq("id", params.id)
       .maybeSingle();
 
-    if (fetchError) throw new Error(fetchError.message);
+    if (fetchError) throw new Error(`Supabase promoter fetch failure: ${fetchError.message}`);
     if (!promoter) return NextResponse.json({ error: "Promoter was not found." }, { status: 404 });
 
     const nextStatus = nextPromoterStatus(promoter.status as PromoterStatus, action);
@@ -47,7 +51,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       })
       .eq("id", params.id);
 
-    if (updateError) throw new Error(updateError.message);
+    if (updateError) throw new Error(`Supabase promoter status update failure: ${updateError.message}`);
+
+    await sendSupportPromoterStatusChangeNotification({
+      promotionName: promoter.promotion_name,
+      promoterEmail: promoter.email,
+      contactName: promoter.contact_name,
+      oldStatus: promoter.status,
+      newStatus: nextStatus,
+      changedAt: new Date()
+    });
 
     if (promoter.status === "pending" && nextStatus === "active") {
       await sendPromoterApprovalEmail({
@@ -59,6 +72,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ ok: true, status: nextStatus });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update promoter.";
+    await sendSupportErrorNotification({
+      errorType: message.startsWith("Supabase promoter status update failure")
+        ? "Supabase Promoter Status Update Failure"
+        : message.startsWith("Supabase promoter fetch failure")
+          ? "Supabase Promoter Fetch Failure"
+          : "Promoter Status Update Failure",
+      source: "app/api/admin/promoters/[id] PATCH",
+      message,
+      operation: "Update promoter status"
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -73,7 +96,15 @@ async function sendPromoterApprovalEmail({
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
-  if (!apiKey || !from || !email) return;
+  if (!apiKey || !from || !email) {
+    await sendSupportErrorNotification({
+      errorType: "Missing Required Environment Variable",
+      source: "sendPromoterApprovalEmail",
+      message: "RESEND_API_KEY, EMAIL_FROM, or promoter email is not configured.",
+      operation: "Send promoter approval email"
+    });
+    return;
+  }
 
   try {
     const resend = new Resend(apiKey);
@@ -94,9 +125,21 @@ async function sendPromoterApprovalEmail({
 
     if (error) {
       console.error(`Promoter approval email failed: ${error.message}`);
+      await sendSupportErrorNotification({
+        errorType: "Email Sending Failure",
+        source: "sendPromoterApprovalEmail",
+        message: error.message,
+        operation: "Send promoter approval email"
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
     console.error(`Promoter approval email failed: ${message}`);
+    await sendSupportErrorNotification({
+      errorType: "Email Sending Failure",
+      source: "sendPromoterApprovalEmail",
+      message,
+      operation: "Send promoter approval email"
+    });
   }
 }

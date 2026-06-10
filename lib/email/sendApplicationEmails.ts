@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
+import { sendSupportErrorNotification } from "@/lib/email/supportNotifications";
 import { independentPromoterId } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
@@ -193,6 +194,13 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
 
     if (error) {
       console.warn(`Promoter notification skipped: ${error.message}`);
+      await sendSupportErrorNotification({
+        errorType: "Supabase Promoter Fetch Failure",
+        source: "sendPromoterNotificationEmail",
+        message: error.message,
+        operation: "Fetch selected promoter for fighter notification",
+        submissionId
+      });
       return null;
     }
 
@@ -211,6 +219,13 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
 
     if (emailError) {
       console.warn(`Promoter notification email failed: ${emailError.message}`);
+      await sendSupportErrorNotification({
+        errorType: "Email Sending Failure",
+        source: "sendPromoterNotificationEmail",
+        message: emailError.message,
+        operation: "Send promoter fighter-submission notification",
+        submissionId
+      });
       return null;
     }
 
@@ -219,6 +234,13 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown promoter notification error.";
     console.warn(`Promoter notification skipped: ${message}`);
+    await sendSupportErrorNotification({
+      errorType: "Promoter Notification Failure",
+      source: "sendPromoterNotificationEmail",
+      message,
+      operation: "Send promoter fighter-submission notification",
+      submissionId
+    });
     return null;
   }
 }

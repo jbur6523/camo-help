@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import {
+  sendSupportErrorNotification,
+  sendSupportPromoterRegistrationNotification
+} from "@/lib/email/supportNotifications";
 import { promoterRegistrationSchema, type PromoterRegistration } from "@/lib/promoters/registrationSchema";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -15,7 +18,14 @@ export async function POST(request: Request) {
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid registration payload.";
+    await sendSupportErrorNotification({
+      errorType: "Upload Parsing Failure",
+      source: "app/api/promoter-registration POST",
+      message,
+      operation: "Parse promoter registration form data"
+    });
     return NextResponse.json({ error: "Invalid registration payload." }, { status: 400 });
   }
 
@@ -70,16 +80,25 @@ export async function POST(request: Request) {
       created_at: new Date().toISOString()
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(`Supabase promoter save failure: ${error.message}`);
 
-    await sendAdminNotification(registration, governmentId);
+    await sendSupportPromoterRegistrationNotification({
+      ...registration,
+      submittedAt: new Date()
+    });
     await sendPromoterPendingVerificationEmail(registration);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Promoter registration failed.";
+    await sendSupportErrorNotification({
+      errorType: message.startsWith("Supabase promoter save failure")
+        ? "Supabase Promoter Save Failure"
+        : "Promoter Registration Failure",
+      source: "app/api/promoter-registration POST",
+      message,
+      operation: "Complete promoter registration"
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -105,53 +124,22 @@ function isAllowedGovernmentIdAttachment(attachment: EmailAttachment) {
   return contentType.startsWith("image/") || contentType === "application/pdf" || /\.(pdf|jpe?g|png|heic|heif|webp)$/i.test(filename);
 }
 
-async function sendAdminNotification(registration: PromoterRegistration, governmentId: EmailAttachment) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  const to = process.env.ADMIN_EMAIL_TO;
-
-  if (!apiKey || !from || !to) return;
-
-  try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from,
-      to,
-      subject: "New promoter registration submitted",
-      text: [
-        `Promotion name: ${registration.promotionName}`,
-        `Date of last promotion: ${registration.lastPromotionDate}`,
-        `Promoter email: ${registration.promoterEmail}`,
-        `Promoter name: ${registration.contactName}`,
-        `Government ID file: ${governmentId.filename}`,
-        `Website/social: ${registration.websiteUrl}`,
-        "Status: pending"
-      ].join("\n"),
-      attachments: [
-        {
-          filename: governmentId.filename,
-          content: governmentId.content,
-          contentType: governmentId.contentType
-        }
-      ]
-    });
-
-    if (error) {
-      console.error(`Promoter registration admin email failed: ${error.message}`);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown email error.";
-    console.error(`Promoter registration admin email failed: ${message}`);
-  }
-}
-
 async function sendPromoterPendingVerificationEmail(registration: PromoterRegistration) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
-  if (!apiKey || !from) return;
+  if (!apiKey || !from) {
+    await sendSupportErrorNotification({
+      errorType: "Missing Required Environment Variable",
+      source: "sendPromoterPendingVerificationEmail",
+      message: "RESEND_API_KEY or EMAIL_FROM is not configured.",
+      operation: "Send promoter pending verification email"
+    });
+    return;
+  }
 
   try {
+    const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from,
@@ -172,9 +160,21 @@ async function sendPromoterPendingVerificationEmail(registration: PromoterRegist
 
     if (error) {
       console.error(`Promoter registration confirmation email failed: ${error.message}`);
+      await sendSupportErrorNotification({
+        errorType: "Email Sending Failure",
+        source: "sendPromoterPendingVerificationEmail",
+        message: error.message,
+        operation: "Send promoter pending verification email"
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
     console.error(`Promoter registration confirmation email failed: ${message}`);
+    await sendSupportErrorNotification({
+      errorType: "Email Sending Failure",
+      source: "sendPromoterPendingVerificationEmail",
+      message,
+      operation: "Send promoter pending verification email"
+    });
   }
 }

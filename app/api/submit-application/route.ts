@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { NoSelectedEmailAttachmentsError, sendApplicationEmails } from "@/lib/email/sendApplicationEmails";
+import {
+  sendSupportErrorNotification,
+  sendSupportFighterSubmissionNotification
+} from "@/lib/email/supportNotifications";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { randomUUID } from "crypto";
@@ -51,6 +55,7 @@ export async function POST(request: Request) {
 
     assertRequiredUploadsPresent(application, uploads);
 
+    const submittedAt = new Date();
     const result = await sendApplicationEmails({
       submissionId,
       application,
@@ -59,10 +64,29 @@ export async function POST(request: Request) {
       uploads
     });
 
+    await sendSupportFighterSubmissionNotification({
+      application,
+      uploads,
+      submittedAt,
+      submissionId,
+      applicationEmailSent: Boolean(result.applicationRecipient),
+      medicalEmailSent: Boolean(result.medicalRecipient),
+      promoterNotificationSent: Boolean(result.promoterRecipient)
+    });
+
     return NextResponse.json({ ok: true, submissionId, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
     console.error("API submission failed.", { submissionId, error: message });
+    if (!(error instanceof NoSelectedEmailAttachmentsError) && !(error instanceof MissingRequiredUploadsError)) {
+      await sendSupportErrorNotification({
+        errorType: classifySubmissionError(message),
+        source: "app/api/submit-application POST",
+        message,
+        operation: "Complete fighter document submission",
+        submissionId
+      });
+    }
     return NextResponse.json(
       { error: message },
       { status: error instanceof NoSelectedEmailAttachmentsError || error instanceof MissingRequiredUploadsError ? 400 : 500 }
@@ -96,4 +120,11 @@ function pruneProcessedSubmissionIds() {
   for (const [submissionId, timestamp] of processedSubmissionIds.entries()) {
     if (timestamp < cutoff) processedSubmissionIds.delete(submissionId);
   }
+}
+
+function classifySubmissionError(message: string) {
+  if (message.startsWith("Missing required email environment variable")) return "Missing Required Environment Variable";
+  if (message.startsWith("Resend email failed")) return "Email Sending Failure";
+  if (message.toLowerCase().includes("formdata") || message.toLowerCase().includes("file")) return "Upload Parsing Failure";
+  return "Fighter Submission Failure";
 }
