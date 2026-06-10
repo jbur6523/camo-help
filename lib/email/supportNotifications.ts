@@ -219,15 +219,27 @@ export async function sendSupportFighterSubmissionNotification({
     submissionId,
     subject: `New Fighter Submission: ${name || "Unknown Fighter"}`,
     text: [
+      "CAMO Help Submission Received",
+      "",
+      "Submission Details",
+      "",
       `Submission ID: ${submissionId}`,
+      `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
+      `Workflow type: ${submissionWorkflowType(application, uploads)}`,
+      "",
+      "Fighter Information",
+      "",
       `Fighter Name: ${name || "Not provided"}`,
       `Fighter Email: ${application.email}`,
       `DOB: ${application.birthDate}`,
       `Selected Promoter: ${selectedPromoterLabel(application)}`,
-      `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
-      `Submission workflow type: ${submissionWorkflowType(application, uploads)}`,
-      "Submission types selected:",
+      "",
+      "Submitted Items",
+      "",
       ...fighterSubmissionTypeLines(application, uploads),
+      "",
+      "Processing Status",
+      "",
       `Athlete License PDF generated: ${athletePdfGenerated ? "yes" : "no"}`,
       `National MMA ID PDF generated: ${nationalIdPdfGenerated ? "yes" : "no"}`,
       `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
@@ -258,8 +270,10 @@ function fighterSubmissionTypeLines(application: ApplicationData, uploads: Parti
     ...(requirementsNeeded.includes("nationalMmaIdApplication") ? [`- ${requirementLabels.nationalMmaIdApplication}`] : []),
     ...(requirementsNeeded.includes("bloodwork") || uploads.bloodwork?.length ? ["- Blood Work"] : []),
     ...(requirementsNeeded.includes("physical") || uploads.physical?.length ? ["- Physical Exam"] : []),
-    ...(uploads.cardio?.length ? ["- Cardio/EKG optional upload included"] : []),
-    ...(uploads.additional?.length ? ["- Additional Documentation optional upload included"] : [])
+    ...(requirementsNeeded.includes("headshot") || uploads.headshot?.length ? ["- Headshot Photo"] : []),
+    ...(requirementsNeeded.includes("photoId") || uploads.photoId?.length ? ["- Driver's License / State ID"] : []),
+    ...(uploads.cardio?.length ? ["- Cardio/EKG Document"] : []),
+    ...(uploads.additional?.length ? ["- Additional Documentation"] : [])
   ];
 
   return lines.length ? lines : ["- None"];
