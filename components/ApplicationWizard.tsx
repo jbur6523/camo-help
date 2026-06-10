@@ -113,7 +113,6 @@ type SubmissionDeliveryState = {
 
 const safeResponsePreviewLength = 180;
 const maxSingleOutgoingFileBytes = 4 * 1024 * 1024;
-const maxTotalOutgoingFileBytes = 4 * 1024 * 1024;
 const identityImageCompression: Record<Extract<UploadKey, "headshot" | "photoId">, { maxDimension: number; quality: number; filenamePrefix: string }> = {
   headshot: { maxDimension: 1200, quality: 0.82, filenamePrefix: "headshot-selfie" },
   photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id" }
@@ -982,15 +981,6 @@ function submissionSizeProblem(files: SubmissionFileSummary[]) {
   const oversizedFile = files.find((file) => file.size > maxSingleOutgoingFileBytes);
   if (oversizedFile) {
     return fileTooLargeMessage(oversizedFile.filename);
-  }
-
-  if (totalFileBytes(files) > maxTotalOutgoingFileBytes) {
-    return [
-      "The selected files are too large to submit together.",
-      "Please upload smaller images or PDFs before submitting.",
-      "If you are uploading full-resolution phone photos, try taking screenshots of the image/document and uploading the screenshots instead.",
-      "For lab results, physical forms, or document images, you can also try saving the document as a smaller PDF, retaking the photo closer to the document, or cropping out unnecessary background before uploading."
-    ].join(" ");
   }
 
   return "";
