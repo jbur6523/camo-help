@@ -6,6 +6,7 @@ import type { ApplicationData, UploadKey, UploadedFiles } from "@/lib/types";
 import { defaultApplicationData, uploadLabels } from "@/lib/types";
 
 const acceptedTypes = ".pdf,.jpg,.jpeg,.png,.heic,.heif";
+const identityPhotoAcceptedTypes = "image/*";
 const uploadOrder: UploadKey[] = ["bloodwork", "physical", "headshot", "photoId", "cardio", "additional"];
 const requirementDrivenUploadKeys: Array<Exclude<UploadKey, "cardio" | "additional">> = ["bloodwork", "physical", "headshot", "photoId"];
 const alwaysVisibleUploadKeys: UploadKey[] = ["cardio", "additional"];
@@ -18,7 +19,7 @@ export function StepUploads({
 }: {
   form: UseFormReturn<ApplicationData>;
   uploadFiles: UploadedFiles;
-  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void;
+  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void | Promise<void>;
   onFileRemove: (key: UploadKey, index: number) => void;
 }) {
   const requirementsNeeded = form.watch("requirementsNeeded") || defaultApplicationData.requirementsNeeded;
@@ -60,7 +61,8 @@ export function StepUploads({
                 onFilesAdd={onFilesAdd}
                 onFileRemove={onFileRemove}
               >
-                Only required for fighters/athletes 40+.
+                Only required for fighters/athletes 40+. Upload a PDF, image, or screenshot of your document. If the file is too large,
+                try uploading a screenshot or smaller PDF instead.
               </UploadTile>
             );
           }
@@ -75,7 +77,8 @@ export function StepUploads({
                 onFilesAdd={onFilesAdd}
                 onFileRemove={onFileRemove}
               >
-                Optional. Add any extra supporting document.
+                Optional. Add any extra supporting document. Upload a PDF, image, or screenshot of your document. If the file is too
+                large, try uploading a screenshot or smaller PDF instead.
               </UploadTile>
             );
           }
@@ -90,7 +93,7 @@ export function StepUploads({
               onFilesAdd={onFilesAdd}
               onFileRemove={onFileRemove}
             >
-              {key === "headshot" ? "Clear color photo of your face, no sunglasses, similar to a passport photo." : null}
+              {uploadHelperText(key)}
             </UploadTile>
           );
         })}
@@ -112,12 +115,13 @@ function UploadTile({
   required: boolean;
   files: File[];
   multiple?: boolean;
-  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void;
+  onFilesAdd: (key: UploadKey, files: File[], options?: { replace?: boolean }) => void | Promise<void>;
   onFileRemove: (key: UploadKey, index: number) => void;
   children?: React.ReactNode;
 }) {
   const inputId = useId();
-  const filePickerLabel = files.length ? (multiple ? "Add additional file" : "Replace file") : "Choose file";
+  const isCameraUpload = uploadKey === "headshot" || uploadKey === "photoId";
+  const filePickerLabel = pickerLabel(uploadKey, files.length > 0, Boolean(multiple));
 
   return (
     <div className="upload-tile">
@@ -129,12 +133,13 @@ function UploadTile({
         id={inputId}
         className="upload-file-input"
         type="file"
-        accept={acceptedTypes}
+        accept={isCameraUpload ? identityPhotoAcceptedTypes : acceptedTypes}
+        capture={uploadKey === "headshot" ? "user" : uploadKey === "photoId" ? "environment" : undefined}
         multiple={multiple}
         onChange={(event) => {
           const selectedFiles = Array.from(event.currentTarget.files || []);
           if (selectedFiles.length) {
-            onFilesAdd(uploadKey, selectedFiles, { replace: !multiple });
+            void onFilesAdd(uploadKey, selectedFiles, { replace: !multiple });
           }
           event.currentTarget.value = "";
         }}
@@ -166,4 +171,20 @@ function displayUploadLabel(key: UploadKey) {
   if (key === "photoId") return "Driver License / State ID";
   if (key === "additional") return "Additional Documentation";
   return uploadLabels[key];
+}
+
+function uploadHelperText(key: UploadKey) {
+  if (key === "headshot") return "Clear color photo of your face, no sunglasses, similar to a passport photo.";
+  if (key === "bloodwork" || key === "physical") {
+    return "Upload a PDF, image, or screenshot of your document. If the file is too large, try uploading a screenshot or smaller PDF instead.";
+  }
+  if (key === "photoId") return "Large phone photos may be too large to submit. Screenshots or smaller photos usually work best.";
+  return null;
+}
+
+function pickerLabel(key: UploadKey, hasFiles: boolean, multiple: boolean) {
+  if (hasFiles) return multiple ? "Add additional file" : key === "headshot" ? "Retake Selfie Photo" : key === "photoId" ? "Retake ID Photo" : "Replace file";
+  if (key === "headshot") return "Take Selfie Photo";
+  if (key === "photoId") return "Take ID Photo";
+  return "Choose file";
 }

@@ -112,6 +112,12 @@ type SubmissionDeliveryState = {
 };
 
 const safeResponsePreviewLength = 180;
+const maxSingleOutgoingFileBytes = 4 * 1024 * 1024;
+const maxTotalOutgoingFileBytes = 4 * 1024 * 1024;
+const identityImageCompression: Record<Extract<UploadKey, "headshot" | "photoId">, { maxDimension: number; quality: number; filenamePrefix: string }> = {
+  headshot: { maxDimension: 1200, quality: 0.82, filenamePrefix: "headshot-selfie" },
+  photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id" }
+};
 
 export function ApplicationWizard() {
   const [started, setStarted] = useState(false);
@@ -289,13 +295,26 @@ export function ApplicationWizard() {
     </main>
   );
 
-  function handleFilesAdd(key: UploadKey, files: File[], options?: { replace?: boolean }) {
+  async function handleFilesAdd(key: UploadKey, files: File[], options?: { replace?: boolean }) {
+    setGlobalError("");
+    let preparedFiles: File[];
+    try {
+      preparedFiles = await prepareUploadFiles(key, files);
+    } catch {
+      fail("We could not prepare that image. Please try taking the photo again or upload a smaller screenshot instead.");
+      return;
+    }
+    if (!preparedFiles.length) return;
+    const oversizedFile = preparedFiles.find((file) => file.size > maxSingleOutgoingFileBytes);
+    if (oversizedFile) {
+      fail(fileTooLargeMessage(oversizedFile.name));
+      return;
+    }
     setUploadFiles((current) => {
-      const nextFiles = options?.replace ? files : [...(current[key] || []), ...files];
+      const nextFiles = options?.replace ? preparedFiles : [...(current[key] || []), ...preparedFiles];
       setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
       return { ...current, [key]: nextFiles };
     });
-    setGlobalError("");
   }
 
   function handleFileRemove(key: UploadKey, index: number) {
@@ -573,6 +592,17 @@ export function ApplicationWizard() {
       });
 
       const outgoingFiles = collectSubmissionFileSummaries(generated, uploadFiles);
+      const sizeProblem = submissionSizeProblem(outgoingFiles);
+      if (sizeProblem) {
+        console.warn("Frontend submission blocked because outgoing files are too large.", {
+          submissionId,
+          fileCount: outgoingFiles.length,
+          totalBytes: totalFileBytes(outgoingFiles)
+        });
+        setGlobalError(sizeProblem);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const response = await fetch("/api/submit-application", {
         method: "POST",
         body: formData
@@ -830,6 +860,92 @@ function isValidEmail(email: string) {
   return /^\S+@\S+\.\S+$/.test(email);
 }
 
+async function prepareUploadFiles(key: UploadKey, files: File[]) {
+  if (key !== "headshot" && key !== "photoId") return files;
+
+  const config = identityImageCompression[key];
+  return Promise.all(
+    files.map(async (file) => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Identity uploads must be image files.");
+      }
+      try {
+        return await compressIdentityImage(file, config);
+      } catch {
+        return file;
+      }
+    })
+  );
+}
+
+async function compressIdentityImage(
+  file: File,
+  {
+    maxDimension,
+    quality,
+    filenamePrefix
+  }: {
+    maxDimension: number;
+    quality: number;
+    filenamePrefix: string;
+  }
+) {
+  const image = await loadImage(file);
+  const { width, height } = fitWithinMaxDimension(image.naturalWidth, image.naturalHeight, maxDimension);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not prepare image.");
+  context.drawImage(image, 0, 0, width, height);
+  const blob = await canvasToJpegBlob(canvas, quality);
+  URL.revokeObjectURL(image.src);
+  return new File([blob], compressedIdentityFilename(file.name, filenamePrefix), {
+    type: "image/jpeg",
+    lastModified: Date.now()
+  });
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => {
+      URL.revokeObjectURL(image.src);
+      reject(new Error("Could not read image."));
+    };
+    image.src = URL.createObjectURL(file);
+  });
+}
+
+function fitWithinMaxDimension(width: number, height: number, maxDimension: number) {
+  const longEdge = Math.max(width, height);
+  if (!longEdge || longEdge <= maxDimension) return { width, height };
+  const scale = maxDimension / longEdge;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  };
+}
+
+function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Could not compress image."));
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+function compressedIdentityFilename(originalName: string, prefix: string) {
+  const baseName = originalName.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  return `${prefix}${baseName ? `-${baseName}` : ""}.jpg`;
+}
+
 function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: UploadedFiles): SubmissionFileSummary[] {
   const files: SubmissionFileSummary[] = [];
   if (generated.athleteBlob) {
@@ -860,6 +976,33 @@ function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: U
 
 function totalFileBytes(files: SubmissionFileSummary[]) {
   return files.reduce((total, file) => total + file.size, 0);
+}
+
+function submissionSizeProblem(files: SubmissionFileSummary[]) {
+  const oversizedFile = files.find((file) => file.size > maxSingleOutgoingFileBytes);
+  if (oversizedFile) {
+    return fileTooLargeMessage(oversizedFile.filename);
+  }
+
+  if (totalFileBytes(files) > maxTotalOutgoingFileBytes) {
+    return [
+      "The selected files are too large to submit together.",
+      "Please upload smaller images or PDFs before submitting.",
+      "If you are uploading full-resolution phone photos, try taking screenshots of the image/document and uploading the screenshots instead.",
+      "For lab results, physical forms, or document images, you can also try saving the document as a smaller PDF, retaking the photo closer to the document, or cropping out unnecessary background before uploading."
+    ].join(" ");
+  }
+
+  return "";
+}
+
+function fileTooLargeMessage(filename: string) {
+  return [
+    `This file is too large to submit: ${filename}.`,
+    "Please upload a smaller image or PDF.",
+    "If you are uploading a full-resolution phone photo, try taking a screenshot of the image/document and uploading the screenshot instead. Screenshots are usually much smaller and are often easier to submit.",
+    "For lab results, physical forms, or document images, you can also try saving the document as a smaller PDF, retaking the photo closer to the document, or cropping out unnecessary background before uploading."
+  ].join(" ");
 }
 
 async function readSubmitApplicationResponse(response: Response): Promise<{
