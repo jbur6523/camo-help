@@ -8,10 +8,10 @@ import type { PromoterStatus } from "@/lib/supabase/database.types";
 type AdminPromoter = {
   id: string;
   promotionName: string;
-  licenseNumber: string;
+  lastPromotionDate: string;
   promoterEmail: string;
   contactName: string;
-  phone: string;
+  governmentIdFileName: string;
   websiteUrl: string | null;
   status: PromoterStatus;
   createdAt: string;
@@ -64,11 +64,11 @@ export function AdminPromotersDashboard() {
                 <span className={`status-pill status-${promoter.status}`}>{promoter.status}</span>
               </div>
               <div className="review-line">
-                <span>License number</span>
-                <strong>{promoter.licenseNumber}</strong>
+                <span>Date of last promotion</span>
+                <strong>{promoter.lastPromotionDate}</strong>
               </div>
               <div className="review-line">
-                <span>Contact person</span>
+                <span>Promoter name</span>
                 <strong>{promoter.contactName}</strong>
               </div>
               <div className="review-line">
@@ -76,8 +76,8 @@ export function AdminPromotersDashboard() {
                 <strong>{promoter.promoterEmail}</strong>
               </div>
               <div className="review-line">
-                <span>Phone</span>
-                <strong>{promoter.phone}</strong>
+                <span>Government ID file</span>
+                <strong>{promoter.governmentIdFileName}</strong>
               </div>
               <div className="review-line">
                 <span>Website/social</span>

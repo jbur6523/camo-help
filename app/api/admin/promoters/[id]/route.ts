@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Resend } from "resend";
 import { isAdminRequestAuthenticated } from "@/lib/admin/auth";
 import { nextPromoterStatus, type PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -27,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error: fetchError } = await supabase
       .from("promoters")
-      .select("id, status")
+      .select("id, status, email, promotion_name")
       .eq("id", params.id)
       .maybeSingle();
 
@@ -48,9 +49,54 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (updateError) throw new Error(updateError.message);
 
+    if (promoter.status === "pending" && nextStatus === "active") {
+      await sendPromoterApprovalEmail({
+        email: promoter.email,
+        promotionName: promoter.promotion_name
+      });
+    }
+
     return NextResponse.json({ ok: true, status: nextStatus });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update promoter.";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function sendPromoterApprovalEmail({
+  email,
+  promotionName
+}: {
+  email: string;
+  promotionName: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+
+  if (!apiKey || !from || !email) return;
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from,
+      to: email,
+      subject: "Promoter Registration Approved",
+      text: [
+        "Congratulations.",
+        "",
+        `Your promoter registration${promotionName ? ` for ${promotionName}` : ""} has been approved on CAMO Help and your promotion is now listed and available for fighter selection.`,
+        "",
+        "Fighters can now choose your promotion when submitting documents through CAMO Help.",
+        "",
+        "If you need to update your information in the future, please contact support."
+      ].join("\n")
+    });
+
+    if (error) {
+      console.error(`Promoter approval email failed: ${error.message}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown email error.";
+    console.error(`Promoter approval email failed: ${message}`);
   }
 }

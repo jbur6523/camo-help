@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
       promoters: (data || []).map((promoter) => ({
         id: promoter.id,
         promotionName: promoter.promotion_name,
-        licenseNumber: promoter.license_number,
+        lastPromotionDate: promoter.license_number,
         promoterEmail: promoter.email,
         contactName: promoter.contact_name,
-        phone: promoter.phone,
+        governmentIdFileName: promoter.phone,
         websiteUrl: promoter.website_or_social,
         status: promoter.status,
         createdAt: promoter.created_at

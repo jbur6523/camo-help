@@ -4,14 +4,13 @@ import { useState } from "react";
 import { promoterRegistrationSchema, type PromoterRegistrationInput } from "@/lib/promoters/registrationSchema";
 
 type FieldName = keyof PromoterRegistrationInput;
-type FieldErrors = Partial<Record<FieldName, string>>;
+type FieldErrors = Partial<Record<FieldName | "governmentId", string>>;
 
 const initialForm: PromoterRegistrationInput = {
   promotionName: "",
-  licenseNumber: "",
+  lastPromotionDate: "",
   promoterEmail: "",
   contactName: "",
-  phone: "",
   websiteUrl: ""
 };
 
@@ -21,6 +20,7 @@ export function PromoterRegistrationForm() {
   const [globalMessage, setGlobalMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [governmentIdFile, setGovernmentIdFile] = useState<File | null>(null);
 
   return (
     <main className="app-shell">
@@ -45,7 +45,7 @@ export function PromoterRegistrationForm() {
               </div>
             ) : null}
             <RegistrationField
-              label="Promotion name"
+              label="Promotion Name (as registered on CAMO)"
               name="promotionName"
               value={form.promotionName}
               error={errors.promotionName}
@@ -53,15 +53,16 @@ export function PromoterRegistrationForm() {
               required
             />
             <RegistrationField
-              label="Promoter license number"
-              name="licenseNumber"
-              value={form.licenseNumber}
-              error={errors.licenseNumber}
+              label="Date of Last Promotion"
+              name="lastPromotionDate"
+              value={form.lastPromotionDate}
+              error={errors.lastPromotionDate}
               onChange={handleChange}
+              type="date"
               required
             />
             <RegistrationField
-              label="Promoter email"
+              label="Promoter Email (For Submission Notifications)"
               name="promoterEmail"
               value={form.promoterEmail}
               error={errors.promoterEmail}
@@ -70,29 +71,29 @@ export function PromoterRegistrationForm() {
               required
             />
             <RegistrationField
-              label="Contact person name"
+              label="Promoter Name"
               name="contactName"
               value={form.contactName}
               error={errors.contactName}
               onChange={handleChange}
               required
             />
-            <RegistrationField
-              label="Phone number"
-              name="phone"
-              value={form.phone}
-              error={errors.phone}
-              onChange={handleChange}
-              type="tel"
-              required
+            <GovernmentIdField
+              file={governmentIdFile}
+              error={errors.governmentId}
+              onChange={(file) => {
+                setGovernmentIdFile(file);
+                setErrors((current) => ({ ...current, governmentId: "" }));
+                setGlobalMessage("");
+              }}
             />
             <RegistrationField
-              label="Website or social link"
+              label="Website / Social Link"
               name="websiteUrl"
               value={form.websiteUrl || ""}
               error={errors.websiteUrl}
               onChange={handleChange}
-              placeholder="Optional"
+              required
             />
             <button className="button primary" type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit Registration"}
@@ -114,18 +115,28 @@ export function PromoterRegistrationForm() {
     setGlobalMessage("");
 
     const parsed = promoterRegistrationSchema.safeParse(form);
-    if (!parsed.success) {
-      setErrors(toFieldErrors(parsed.error.flatten().fieldErrors));
+    const nextErrors: FieldErrors = parsed.success ? {} : toFieldErrors(parsed.error.flatten().fieldErrors);
+    if (!governmentIdFile) {
+      nextErrors.governmentId = "Driver License / Government-Issued ID is required.";
+    }
+
+    if (!parsed.success || !governmentIdFile) {
+      setErrors(nextErrors);
       setGlobalMessage("Please complete the required fields.");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        formData.append(key, value || "");
+      });
+      formData.append("governmentId", governmentIdFile);
+
       const response = await fetch("/api/promoter-registration", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: formData
       });
       const result = await response.json();
       if (!response.ok) {
@@ -134,6 +145,7 @@ export function PromoterRegistrationForm() {
       }
       setSubmitted(true);
       setForm(initialForm);
+      setGovernmentIdFile(null);
     } catch (error) {
       setGlobalMessage(error instanceof Error ? error.message : "Registration failed.");
     } finally {
@@ -173,6 +185,34 @@ function RegistrationField({
         required={required}
         onChange={(event) => onChange(name, event.currentTarget.value)}
       />
+      {error ? <div className="error">{error}</div> : null}
+    </div>
+  );
+}
+
+function GovernmentIdField({
+  file,
+  error,
+  onChange
+}: {
+  file: File | null;
+  error?: string;
+  onChange: (file: File | null) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor="governmentId">Driver License / Government-Issued ID</label>
+      <small>The name on the ID should match the promoter name registered on CAMO.</small>
+      <input
+        id="governmentId"
+        name="governmentId"
+        type="file"
+        accept="image/*,.pdf,application/pdf"
+        capture="environment"
+        required
+        onChange={(event) => onChange(event.currentTarget.files?.[0] || null)}
+      />
+      {file ? <small>Selected: {file.name}</small> : null}
       {error ? <div className="error">{error}</div> : null}
     </div>
   );
