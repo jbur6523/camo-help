@@ -264,8 +264,6 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
         "Submitted documents:",
         ...selectedSubmissionLines(application),
         "",
-        "If you do not receive this email within a few minutes, check your spam folder or contact support@camo-help.com.",
-        "",
         "This is an automated message. Please do not reply to this email."
       ].join("\n")
     });
@@ -344,11 +342,7 @@ function selectedRequirementLabels(application: ApplicationData) {
 }
 
 function complianceContactLine(fighterEmail: string) {
-  return [
-    "This submission was prepared and sent through CAMO Help, an independent document preparation service.",
-    "For any issues with this application or submitted paperwork, please contact the fighter directly at:",
-    fighterEmail
-  ].join("\n");
+  return `This is being submitted by a third-party service. For issues of non-compliance, please contact the fighter directly at ${fighterEmail}`;
 }
 
 function applicationRequirementLines(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
