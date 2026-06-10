@@ -620,7 +620,7 @@ function GenerateStep({
                 ) : null}
               </div>
             ) : null}
-            <button className="button primary" type="button" onClick={onSubmit} disabled={isBusy}>
+            <button className="button primary submit-documents-button" type="button" onClick={onSubmit} disabled={isBusy}>
               {isBusy ? "Working..." : "Submit Documents"}
             </button>
           </>
