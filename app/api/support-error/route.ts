@@ -9,6 +9,7 @@ type ClientSupportErrorPayload = {
   source?: string;
   message?: string;
   operation?: string;
+  details?: string[];
   fighterName?: string;
   fighterEmail?: string;
   userShownOutcome?: "none" | "failure" | "partial";
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     source: payload.source || "client",
     message: safeErrorMessage(payload.message || "Client-side submission error."),
     operation: payload.operation || "Complete client-side submission step",
+    details: Array.isArray(payload.details) ? payload.details.slice(0, 30) : undefined,
     submissionId: payload.submissionId,
     fighterName: payload.fighterName,
     fighterEmail: payload.fighterEmail,

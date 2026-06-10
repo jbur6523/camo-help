@@ -16,6 +16,7 @@ type SupportErrorNotification = {
   source: string;
   message: string;
   operation: string;
+  details?: string[];
   submissionId?: string;
   fighterName?: string;
   fighterEmail?: string;
@@ -124,6 +125,7 @@ export async function sendSupportErrorNotification({
   source,
   message,
   operation,
+  details,
   submissionId,
   fighterName,
   fighterEmail,
@@ -146,6 +148,7 @@ export async function sendSupportErrorNotification({
       ...(promoterName ? [`Promoter name: ${promoterName}`] : []),
       ...(promotionName ? [`Promotion name: ${promotionName}`] : []),
       `Operation failed: ${operation}`,
+      ...(details?.length ? ["Details:", ...details.map((detail) => `- ${safeErrorMessage(detail)}`)] : []),
       `User-facing outcome: ${userShownOutcome || "none"}`
     ].join("\n")
   });
