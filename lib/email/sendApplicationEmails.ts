@@ -82,11 +82,13 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
   }
 
   const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application, submissionId);
+  const fighterConfirmationRecipient = await sendFighterConfirmationEmail(resend, from, payload.application, submissionId);
 
   return {
     applicationRecipient: messages.some((message) => message.kind === "application") ? applicationRecipient : null,
     medicalRecipient: messages.some((message) => message.kind === "medical") ? medicalRecipient : null,
     promoterRecipient,
+    fighterConfirmationRecipient,
     resendMessageIds,
     betaMode
   };
@@ -245,6 +247,57 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
   }
 }
 
+async function sendFighterConfirmationEmail(resend: Resend, from: string, application: ApplicationData, submissionId: string) {
+  if (!application.email) return null;
+
+  try {
+    console.info("Fighter confirmation email send attempted.", { submissionId });
+    const { data, error } = await resend.emails.send({
+      from,
+      to: application.email,
+      subject: "CAMO Help Submission Received",
+      text: [
+        `Hi ${application.firstName || "there"},`,
+        "",
+        "Your selected documents have been submitted by email.",
+        "",
+        "Submitted documents:",
+        ...selectedSubmissionLines(application),
+        "",
+        "If you do not receive this email within a few minutes, check your spam folder or contact support@camo-help.com.",
+        "",
+        "This is an automated message. Please do not reply to this email."
+      ].join("\n")
+    });
+
+    if (error) {
+      console.warn(`Fighter confirmation email failed: ${error.message}`);
+      await sendSupportErrorNotification({
+        errorType: "Email Sending Failure",
+        source: "sendFighterConfirmationEmail",
+        message: error.message,
+        operation: "Send fighter submission confirmation email",
+        submissionId
+      });
+      return null;
+    }
+
+    console.info("Fighter confirmation email send completed.", { submissionId, resendMessageId: data?.id || null });
+    return application.email;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown fighter confirmation email error.";
+    console.warn(`Fighter confirmation email failed: ${message}`);
+    await sendSupportErrorNotification({
+      errorType: "Email Sending Failure",
+      source: "sendFighterConfirmationEmail",
+      message,
+      operation: "Send fighter submission confirmation email",
+      submissionId
+    });
+    return null;
+  }
+}
+
 function buildApplicationEmailBody(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
   return [
     complianceContactLine(application.email),
@@ -291,7 +344,11 @@ function selectedRequirementLabels(application: ApplicationData) {
 }
 
 function complianceContactLine(fighterEmail: string) {
-  return `This is being submitted by a third-party service. For issues of non-compliance, please reply all to this email or contact the fighter directly at ${fighterEmail}.`;
+  return [
+    "This submission was prepared and sent through CAMO Help, an independent document preparation service.",
+    "For any issues with this application or submitted paperwork, please contact the fighter directly at:",
+    fighterEmail
+  ].join("\n");
 }
 
 function applicationRequirementLines(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
@@ -322,6 +379,20 @@ function medicalRequirementLines(uploads: Partial<Record<UploadKey, EmailAttachm
     ...(uploads.cardio?.length ? ["* Cardio/EKG"] : []),
     ...(uploads.additional?.length ? ["* Additional Documentation"] : [])
   ];
+}
+
+function selectedSubmissionLines(application: ApplicationData) {
+  const requirementsNeeded = application.requirementsNeeded || [];
+  const lines = [
+    ...(requirementsNeeded.includes("athleteLicenseApplication") ? ["- Athlete License Application"] : []),
+    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["- National MMA ID Application"] : []),
+    ...(requirementsNeeded.includes("bloodwork") ? ["- Blood Work"] : []),
+    ...(requirementsNeeded.includes("physical") ? ["- Physical Exam"] : []),
+    ...(requirementsNeeded.includes("headshot") ? ["- Headshot Photo"] : []),
+    ...(requirementsNeeded.includes("photoId") ? ["- Driver's License / State ID"] : [])
+  ];
+
+  return lines.length ? lines : ["- Selected documents"];
 }
 
 function formatEmailDate(date: Date) {

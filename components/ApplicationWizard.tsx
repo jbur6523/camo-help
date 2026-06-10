@@ -71,6 +71,7 @@ type GeneratedPdfs = {
   nationalBlob?: Blob;
   athleteUrl?: string;
   nationalUrl?: string;
+  email: string;
 };
 
 type ConfigStatus = {
@@ -87,9 +88,9 @@ export function ApplicationWizard() {
   const [pdfs, setPdfs] = useState<GeneratedPdfs | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
+  const [finalEmailError, setFinalEmailError] = useState("");
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const submissionInFlightRef = useRef(false);
-  const autoPdfGenerationInFlightRef = useRef(false);
-  const autoPdfGeneratedForCurrentVisitRef = useRef(false);
 
   const form = useForm<ApplicationData>({
     mode: "onBlur",
@@ -124,21 +125,6 @@ export function ApplicationWizard() {
   }, [watch]);
 
   useEffect(() => {
-    if (step !== "generate") {
-      autoPdfGeneratedForCurrentVisitRef.current = false;
-      return;
-    }
-
-    if (documentsOnly || autoPdfGeneratedForCurrentVisitRef.current || autoPdfGenerationInFlightRef.current) return;
-
-    autoPdfGeneratedForCurrentVisitRef.current = true;
-    autoPdfGenerationInFlightRef.current = true;
-    void generatePdfs().finally(() => {
-      autoPdfGenerationInFlightRef.current = false;
-    });
-  }, [step, documentsOnly]);
-
-  useEffect(() => {
     const formattedBirthDate = formatBirthDateInput(data.birthDate);
     if (formattedBirthDate && formattedBirthDate !== data.birthDate) {
       setValue("birthDate", formattedBirthDate, { shouldValidate: true, shouldDirty: true });
@@ -168,6 +154,7 @@ export function ApplicationWizard() {
         nationalPdfUrl={pdfs.nationalUrl}
         totalDue={paymentTotal(data.requirementsNeeded || defaultApplicationData.requirementsNeeded)}
         documentsOnly={documentsOnly}
+        fighterEmail={submittedEmail || data.email}
       />
     );
   }
@@ -238,6 +225,10 @@ export function ApplicationWizard() {
           <GenerateStep
             pdfs={pdfs}
             isBusy={isBusy}
+            email={data.email}
+            emailError={finalEmailError}
+            onEmailChange={handleFinalEmailChange}
+            onGenerate={confirmEmailAndGenerateForms}
             onSubmit={submitDocuments}
             documentsOnly={documentsOnly}
           />
@@ -449,7 +440,8 @@ export function ApplicationWizard() {
         athleteBlob,
         nationalBlob,
         athleteUrl: athleteBlob ? URL.createObjectURL(athleteBlob) : undefined,
-        nationalUrl: nationalBlob ? URL.createObjectURL(nationalBlob) : undefined
+        nationalUrl: nationalBlob ? URL.createObjectURL(nationalBlob) : undefined,
+        email: values.email
       };
       setPdfs(generated);
       return generated;
@@ -485,8 +477,20 @@ export function ApplicationWizard() {
     }
 
     try {
-      const generated = pdfs || (await generatePdfs({ manageBusy: false }));
-      if (!generated) throw new Error("Generate the PDFs before submitting.");
+      const finalEmail = form.getValues("email").trim();
+      if (!isValidEmail(finalEmail)) {
+        setFinalEmailError("Enter a valid email address.");
+        setGlobalError("Confirm a valid email address and generate forms before submitting.");
+        submissionInFlightRef.current = false;
+        setIsBusy(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setFinalEmailError("");
+      setValue("email", finalEmail, { shouldValidate: true, shouldDirty: true });
+
+      const generated = pdfs?.email === finalEmail ? pdfs : null;
+      if (!generated) throw new Error("Confirm your email and generate forms before submitting.");
       const values = form.getValues();
       const formData = new FormData();
       formData.append("submissionId", submissionId);
@@ -508,6 +512,7 @@ export function ApplicationWizard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Submission failed.");
       window.localStorage.removeItem(storageKey);
+      setSubmittedEmail(values.email);
       setSubmitted(true);
     } catch (error) {
       setGlobalError(error instanceof Error ? error.message : "Submission failed.");
@@ -517,45 +522,109 @@ export function ApplicationWizard() {
       setIsBusy(false);
     }
   }
+
+  function handleFinalEmailChange(email: string) {
+    setValue("email", email, { shouldValidate: true, shouldDirty: true });
+    setFinalEmailError("");
+    if (pdfs) {
+      if (pdfs.athleteUrl) URL.revokeObjectURL(pdfs.athleteUrl);
+      if (pdfs.nationalUrl) URL.revokeObjectURL(pdfs.nationalUrl);
+      setPdfs(null);
+    }
+  }
+
+  async function confirmEmailAndGenerateForms() {
+    const email = form.getValues("email").trim();
+    if (!isValidEmail(email)) {
+      setFinalEmailError("Enter a valid email address.");
+      setGlobalError("Enter a valid email address before generating forms.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setFinalEmailError("");
+    setGlobalError("");
+    setValue("email", email, { shouldValidate: true, shouldDirty: true });
+    await generatePdfs();
+  }
 }
 
 function GenerateStep({
   pdfs,
   isBusy,
+  email,
+  emailError,
+  onEmailChange,
+  onGenerate,
   onSubmit,
   documentsOnly
 }: {
   pdfs: GeneratedPdfs | null;
   isBusy: boolean;
+  email: string;
+  emailError: string;
+  onEmailChange: (email: string) => void;
+  onGenerate: () => Promise<void>;
   onSubmit: () => Promise<void>;
   documentsOnly: boolean;
 }) {
+  const hasCurrentGeneratedForms = Boolean(pdfs && pdfs.email === email.trim());
+
   return (
     <>
       <h2 className="step-title">Submit Documents</h2>
       <p className="step-help">
         {documentsOnly
-          ? "Submit your selected documents by email."
-          : "Download your completed forms if you want a copy, then submit your documents by email."}
+          ? "Confirm your email, then submit your selected documents by email."
+          : "Confirm your email, generate your completed forms, then submit your documents by email."}
       </p>
       <div className="field-grid">
-        {pdfs ? (
-          <div className="download-list">
-            {pdfs.athleteUrl ? (
-              <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
-                Download Athlete License PDF
-              </a>
-            ) : null}
-            {pdfs.nationalUrl ? (
-              <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
-                Download National MMA ID PDF
-              </a>
-            ) : null}
+        <section className="final-email-confirmation" aria-labelledby="confirm-email-heading">
+          <h3 id="confirm-email-heading">Confirm Email</h3>
+          <p>
+            This email will be used for your submission confirmation and included as your contact email on your CAMO paperwork in case
+            there are any issues with your application. Please make sure it is entered correctly.
+          </p>
+          <div className="field">
+            <label htmlFor="final-email">Email Address</label>
+            <input
+              id="final-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => onEmailChange(event.currentTarget.value)}
+              aria-invalid={Boolean(emailError)}
+              aria-describedby={emailError ? "final-email-error" : undefined}
+            />
+            {emailError ? <div className="error" id="final-email-error">{emailError}</div> : null}
           </div>
+        </section>
+        {!hasCurrentGeneratedForms ? (
+          <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
+            {isBusy ? "Working..." : "Confirm Email & Generate Forms"}
+          </button>
         ) : null}
-        <button className="button primary" type="button" onClick={onSubmit} disabled={isBusy}>
-          {isBusy ? "Working..." : "Submit Documents"}
-        </button>
+        {hasCurrentGeneratedForms ? (
+          <>
+            {pdfs?.athleteUrl || pdfs?.nationalUrl ? (
+              <div className="download-list">
+                {pdfs.athleteUrl ? (
+                  <a href={pdfs.athleteUrl} download="completed-athlete-license.pdf">
+                    Download Athlete License PDF
+                  </a>
+                ) : null}
+                {pdfs.nationalUrl ? (
+                  <a href={pdfs.nationalUrl} download="completed-national-mma-id.pdf">
+                    Download National MMA ID PDF
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+            <button className="button primary" type="button" onClick={onSubmit} disabled={isBusy}>
+              {isBusy ? "Working..." : "Submit Documents"}
+            </button>
+          </>
+        ) : null}
       </div>
     </>
   );
@@ -577,6 +646,10 @@ function isValidAge(age: string) {
 function isValidHeightInches(heightInches: string) {
   const value = Number(heightInches);
   return Number.isInteger(value) && value >= 0 && value <= 12;
+}
+
+function isValidEmail(email: string) {
+  return /^\S+@\S+\.\S+$/.test(email);
 }
 
 function createSubmissionId() {

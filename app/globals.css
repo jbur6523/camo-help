@@ -714,6 +714,31 @@ textarea {
   margin: 18px 0;
 }
 
+.confirmation-email-notice {
+  margin: 16px 0;
+}
+
+.final-email-confirmation {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #cfe1d9;
+  border-radius: 8px;
+  background: #eef5f1;
+}
+
+.final-email-confirmation h3 {
+  margin: 0;
+  color: var(--brand-dark);
+  font-size: 18px;
+}
+
+.final-email-confirmation p {
+  margin: 0;
+  color: #344149;
+  line-height: 1.4;
+}
+
 .payment-action {
   margin: 18px 0;
 }
