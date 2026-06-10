@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { NoSelectedEmailAttachmentsError, sendApplicationEmails } from "@/lib/email/sendApplicationEmails";
+import { NoSelectedEmailAttachmentsError, sendApplicationEmails, SubmissionEmailDeliveryError } from "@/lib/email/sendApplicationEmails";
 import {
   sendSupportErrorNotification,
   sendSupportFighterSubmissionNotification
 } from "@/lib/email/supportNotifications";
+import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApplicationData, UploadKey } from "@/lib/types";
-import { randomUUID } from "crypto";
+import { fullName } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -16,10 +17,11 @@ const processedSubmissionIds = new Map<string, number>();
 
 export async function POST(request: Request) {
   let submissionId = "unknown";
+  let applicationForError: ApplicationData | null = null;
   try {
     const formData = await request.formData();
     const submittedId = formData.get("submissionId");
-    submissionId = typeof submittedId === "string" && submittedId.trim() ? submittedId.trim() : randomUUID();
+    submissionId = typeof submittedId === "string" && submittedId.trim() ? submittedId.trim() : createSubmissionReferenceId();
     pruneProcessedSubmissionIds();
     console.info("API submission request received.", { submissionId });
 
@@ -32,10 +34,11 @@ export async function POST(request: Request) {
 
     const applicationJson = formData.get("application");
     if (typeof applicationJson !== "string") {
-      return NextResponse.json({ error: "Application payload is missing." }, { status: 400 });
+      throw new Error("Application payload is missing.");
     }
 
     const application = JSON.parse(applicationJson) as ApplicationData;
+    applicationForError = application;
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
@@ -69,26 +72,37 @@ export async function POST(request: Request) {
       uploads,
       submittedAt,
       submissionId,
+      athletePdfGenerated: Boolean(athletePdf),
+      nationalIdPdfGenerated: Boolean(nationalIdPdf),
       applicationEmailSent: Boolean(result.applicationRecipient),
       medicalEmailSent: Boolean(result.medicalRecipient),
+      fighterConfirmationEmailSent: Boolean(result.fighterConfirmationRecipient),
       promoterNotificationSent: Boolean(result.promoterRecipient)
     });
 
     return NextResponse.json({ ok: true, submissionId, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
+    const isPartial = error instanceof SubmissionEmailDeliveryError && error.sentKinds.length > 0;
     console.error("API submission failed.", { submissionId, error: message });
-    if (!(error instanceof NoSelectedEmailAttachmentsError) && !(error instanceof MissingRequiredUploadsError)) {
-      await sendSupportErrorNotification({
-        errorType: classifySubmissionError(message),
-        source: "app/api/submit-application POST",
-        message,
-        operation: "Complete fighter document submission",
-        submissionId
-      });
-    }
+    await sendSupportErrorNotification({
+      errorType: classifySubmissionError(message, error),
+      source: "app/api/submit-application POST",
+      message,
+      operation: "Complete fighter document submission",
+      submissionId,
+      fighterName: applicationForError ? fullName(applicationForError) : undefined,
+      fighterEmail: applicationForError?.email,
+      userShownOutcome: isPartial ? "partial" : "failure"
+    });
     return NextResponse.json(
-      { error: message },
+      {
+        error: isPartial
+          ? "Some of your documents may not have been delivered successfully."
+          : "We were unable to submit your documents at this time.",
+        submissionId,
+        failureKind: isPartial ? "partial" : "failed"
+      },
       { status: error instanceof NoSelectedEmailAttachmentsError || error instanceof MissingRequiredUploadsError ? 400 : 500 }
     );
   }
@@ -122,7 +136,12 @@ function pruneProcessedSubmissionIds() {
   }
 }
 
-function classifySubmissionError(message: string) {
+function classifySubmissionError(message: string, error: unknown) {
+  if (error instanceof SubmissionEmailDeliveryError) {
+    return error.failedKind === "application" ? "Application Email Failure" : "Medical Email Failure";
+  }
+  if (error instanceof MissingRequiredUploadsError) return "Upload Validation Failure";
+  if (error instanceof NoSelectedEmailAttachmentsError) return "No Selected Email Attachments";
   if (message.startsWith("Missing required email environment variable")) return "Missing Required Environment Variable";
   if (message.startsWith("Resend email failed")) return "Email Sending Failure";
   if (message.toLowerCase().includes("formdata") || message.toLowerCase().includes("file")) return "Upload Parsing Failure";

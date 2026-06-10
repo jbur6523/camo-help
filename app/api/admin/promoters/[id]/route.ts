@@ -28,6 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Promoter action is required." }, { status: 400 });
   }
 
+  let promoterForError: { email: string; promotion_name: string; contact_name: string } | null = null;
   try {
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error: fetchError } = await supabase
@@ -38,6 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (fetchError) throw new Error(`Supabase promoter fetch failure: ${fetchError.message}`);
     if (!promoter) return NextResponse.json({ error: "Promoter was not found." }, { status: 404 });
+    promoterForError = promoter;
 
     const nextStatus = nextPromoterStatus(promoter.status as PromoterStatus, action);
     if (!nextStatus) {
@@ -80,7 +82,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           : "Promoter Status Update Failure",
       source: "app/api/admin/promoters/[id] PATCH",
       message,
-      operation: "Update promoter status"
+      operation: "Update promoter status",
+      promoterName: promoterForError?.contact_name,
+      promotionName: promoterForError?.promotion_name,
+      userShownOutcome: "failure"
     });
     return NextResponse.json({ error: message }, { status: 500 });
   }

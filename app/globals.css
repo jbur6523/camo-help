@@ -803,6 +803,21 @@ textarea {
   justify-self: center;
 }
 
+.submission-failure-page {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.submission-failure-notice {
+  border-color: #e7c6c0;
+  background: #fff4f2;
+}
+
+.submission-failure-notice strong {
+  color: var(--danger);
+}
+
 .admin-page {
   padding-bottom: 32px;
 }

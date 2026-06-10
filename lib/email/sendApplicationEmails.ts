@@ -36,6 +36,26 @@ export class NoSelectedEmailAttachmentsError extends Error {
   }
 }
 
+export class SubmissionEmailDeliveryError extends Error {
+  failedKind: SubmissionEmailMessage["kind"];
+  sentKinds: SubmissionEmailMessage["kind"][];
+
+  constructor({
+    failedKind,
+    sentKinds,
+    message
+  }: {
+    failedKind: SubmissionEmailMessage["kind"];
+    sentKinds: SubmissionEmailMessage["kind"][];
+    message: string;
+  }) {
+    super(message);
+    this.name = "SubmissionEmailDeliveryError";
+    this.failedKind = failedKind;
+    this.sentKinds = sentKinds;
+  }
+}
+
 export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
   const submissionId = payload.submissionId || "unknown";
   console.info("sendApplicationEmails started.", { submissionId });
@@ -58,6 +78,7 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     betaMode
   });
   const resendMessageIds: Partial<Record<SubmissionEmailMessage["kind"], string | null>> = {};
+  const sentKinds: SubmissionEmailMessage["kind"][] = [];
 
   for (const [index, message] of messages.entries()) {
     if (index > 0) await delay(submissionEmailSendDelayMs);
@@ -66,14 +87,25 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
       kind: message.kind,
       attachmentCount: message.attachments.length
     });
-    const resendMessageId = await sendResendEmail(resend, {
-      from,
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      attachments: message.attachments
-    });
+    let resendMessageId: string | null;
+    try {
+      resendMessageId = await sendResendEmail(resend, {
+        from,
+        to: message.to,
+        subject: message.subject,
+        text: message.text,
+        attachments: message.attachments
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Submission email failed.";
+      throw new SubmissionEmailDeliveryError({
+        failedKind: message.kind,
+        sentKinds,
+        message: errorMessage
+      });
+    }
     resendMessageIds[message.kind] = resendMessageId;
+    sentKinds.push(message.kind);
     console.info("Submission email send completed.", {
       submissionId,
       kind: message.kind,
@@ -260,6 +292,7 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
         `Hi ${application.firstName || "there"},`,
         "",
         "Your selected documents have been submitted by email.",
+        `Reference ID: ${submissionId}`,
         "",
         "Submitted documents:",
         ...selectedSubmissionLines(application),
@@ -342,7 +375,11 @@ function selectedRequirementLabels(application: ApplicationData) {
 }
 
 function complianceContactLine(fighterEmail: string) {
-  return `This is being submitted by a third-party service. For issues of non-compliance, please contact the fighter directly at ${fighterEmail}`;
+  return [
+    "This submission was prepared and sent through CAMO Help, an independent document preparation service.",
+    "For any issues with this application or submitted paperwork, please contact the fighter directly at:",
+    fighterEmail
+  ].join("\n");
 }
 
 function applicationRequirementLines(application: ApplicationData, applicationAttachments: EmailAttachment[]) {

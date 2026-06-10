@@ -24,7 +24,8 @@ export async function POST(request: Request) {
       errorType: "Upload Parsing Failure",
       source: "app/api/promoter-registration POST",
       message,
-      operation: "Parse promoter registration form data"
+      operation: "Parse promoter registration form data",
+      userShownOutcome: "failure"
     });
     return NextResponse.json({ error: "Invalid registration payload." }, { status: 400 });
   }
@@ -97,7 +98,10 @@ export async function POST(request: Request) {
         : "Promoter Registration Failure",
       source: "app/api/promoter-registration POST",
       message,
-      operation: "Complete promoter registration"
+      operation: "Complete promoter registration",
+      promoterName: body.contactName,
+      promotionName: body.promotionName,
+      userShownOutcome: "failure"
     });
     return NextResponse.json({ error: message }, { status: 500 });
   }

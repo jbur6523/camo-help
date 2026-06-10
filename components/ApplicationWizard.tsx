@@ -21,11 +21,13 @@ import {
   defaultApplicationData,
   fightRecordTotal,
   formatBirthDateInput,
+  fullName,
   paymentTotal,
   type ApplicationData,
   type UploadKey,
   type UploadedFiles
 } from "@/lib/types";
+import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 
 const storageKey = "camo-help-application-v1";
 
@@ -79,6 +81,11 @@ type ConfigStatus = {
   emailConfigured: boolean;
 };
 
+type SubmissionFailure = {
+  kind: "failed" | "partial";
+  submissionId: string;
+};
+
 export function ApplicationWizard() {
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState<StepId>("requirements");
@@ -90,6 +97,9 @@ export function ApplicationWizard() {
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
   const [finalEmailError, setFinalEmailError] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState("");
+  const [submittedSubmissionId, setSubmittedSubmissionId] = useState("");
+  const [pendingSubmissionId, setPendingSubmissionId] = useState("");
+  const [submissionFailure, setSubmissionFailure] = useState<SubmissionFailure | null>(null);
   const submissionInFlightRef = useRef(false);
 
   const form = useForm<ApplicationData>({
@@ -147,6 +157,10 @@ export function ApplicationWizard() {
 
   const progress = useMemo(() => Math.round(((activeStepIndex + 1) / activeSteps.length) * 100), [activeStepIndex, activeSteps.length]);
 
+  if (submissionFailure) {
+    return <SubmissionFailurePage failure={submissionFailure} />;
+  }
+
   if (submitted && pdfs) {
     return (
       <SuccessPage
@@ -155,6 +169,7 @@ export function ApplicationWizard() {
         totalDue={paymentTotal(data.requirementsNeeded || defaultApplicationData.requirementsNeeded)}
         documentsOnly={documentsOnly}
         fighterEmail={submittedEmail || data.email}
+        submissionId={submittedSubmissionId}
       />
     );
   }
@@ -410,7 +425,7 @@ export function ApplicationWizard() {
     return false;
   }
 
-  async function generatePdfs({ manageBusy = true }: { manageBusy?: boolean } = {}) {
+  async function generatePdfs({ manageBusy = true, submissionId }: { manageBusy?: boolean; submissionId?: string } = {}) {
     if (manageBusy) setIsBusy(true);
     setGlobalError("");
     try {
@@ -444,9 +459,28 @@ export function ApplicationWizard() {
         email: values.email
       };
       setPdfs(generated);
+      console.info("PDF generation completed.", {
+        submissionId: submissionId || "not assigned",
+        athletePdfGenerated: Boolean(athleteBlob),
+        nationalIdPdfGenerated: Boolean(nationalBlob)
+      });
       return generated;
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : "Could not generate PDFs.");
+      const message = error instanceof Error ? error.message : "Could not generate PDFs.";
+      console.error("PDF generation failed.", { submissionId: submissionId || "not assigned", error: message });
+      if (submissionId) {
+        await notifyClientSupportError({
+          submissionId,
+          errorType: "PDF Generation Failure",
+          source: "components/ApplicationWizard.generatePdfs",
+          message,
+          operation: "Generate selected application PDFs",
+          userShownOutcome: "failure",
+          fighterName: fullName(form.getValues()),
+          fighterEmail: form.getValues("email")
+        });
+      }
+      setGlobalError("We were unable to generate your forms at this time.");
       return null;
     } finally {
       if (manageBusy) setIsBusy(false);
@@ -459,7 +493,8 @@ export function ApplicationWizard() {
       return;
     }
 
-    const submissionId = createSubmissionId();
+    const submissionId = pendingSubmissionId || createSubmissionId();
+    setPendingSubmissionId(submissionId);
     submissionInFlightRef.current = true;
     setIsBusy(true);
     setGlobalError("");
@@ -490,7 +525,10 @@ export function ApplicationWizard() {
       setValue("email", finalEmail, { shouldValidate: true, shouldDirty: true });
 
       const generated = pdfs?.email === finalEmail ? pdfs : null;
-      if (!generated) throw new Error("Confirm your email and generate forms before submitting.");
+      if (!generated) {
+        setSubmissionFailure({ kind: "failed", submissionId });
+        return;
+      }
       const values = form.getValues();
       const formData = new FormData();
       formData.append("submissionId", submissionId);
@@ -510,12 +548,31 @@ export function ApplicationWizard() {
         body: formData
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Submission failed.");
+      if (!response.ok) {
+        setSubmissionFailure({
+          kind: result.failureKind === "partial" ? "partial" : "failed",
+          submissionId: result.submissionId || submissionId
+        });
+        return;
+      }
       window.localStorage.removeItem(storageKey);
       setSubmittedEmail(values.email);
+      setSubmittedSubmissionId(result.submissionId || submissionId);
       setSubmitted(true);
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : "Submission failed.");
+      const message = error instanceof Error ? error.message : "Submission failed.";
+      console.error("Frontend submission failed.", { submissionId, error: message });
+      void notifyClientSupportError({
+        submissionId,
+        errorType: "Client Submission Failure",
+        source: "components/ApplicationWizard.submitDocuments",
+        message,
+        operation: "Submit documents from browser",
+        userShownOutcome: "failure",
+        fighterName: fullName(form.getValues()),
+        fighterEmail: form.getValues("email")
+      });
+      setSubmissionFailure({ kind: "failed", submissionId });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       submissionInFlightRef.current = false;
@@ -535,6 +592,8 @@ export function ApplicationWizard() {
 
   async function confirmEmailAndGenerateForms() {
     const email = form.getValues("email").trim();
+    const submissionId = pendingSubmissionId || createSubmissionId();
+    setPendingSubmissionId(submissionId);
     if (!isValidEmail(email)) {
       setFinalEmailError("Enter a valid email address.");
       setGlobalError("Enter a valid email address before generating forms.");
@@ -544,8 +603,40 @@ export function ApplicationWizard() {
     setFinalEmailError("");
     setGlobalError("");
     setValue("email", email, { shouldValidate: true, shouldDirty: true });
-    await generatePdfs();
+    const generated = await generatePdfs({ submissionId });
+    if (!generated) {
+      setSubmissionFailure({ kind: "failed", submissionId });
+    }
   }
+}
+
+function SubmissionFailurePage({ failure }: { failure: SubmissionFailure }) {
+  const isPartial = failure.kind === "partial";
+  return (
+    <main className="app-shell">
+      <section className="wizard-body submission-failure-page">
+        <div className="brand-mark">CA</div>
+        <h1 className="step-title">{isPartial ? "Submission Incomplete" : "Submission Failed"}</h1>
+        <div className="notice submission-failure-notice">
+          {isPartial ? (
+            <>
+              <p>Some of your documents may not have been delivered successfully.</p>
+              <p>Please take a screenshot of this page and contact support@camo-help.com.</p>
+            </>
+          ) : (
+            <>
+              <p>We were unable to submit your documents at this time.</p>
+              <p>Please do not submit multiple times.</p>
+              <p>Take a screenshot of this page and contact support@camo-help.com.</p>
+            </>
+          )}
+          <p>
+            <strong>Reference ID: {failure.submissionId}</strong>
+          </p>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function GenerateStep({
@@ -653,10 +744,7 @@ function isValidEmail(email: string) {
 }
 
 function createSubmissionId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return createSubmissionReferenceId();
 }
 
 function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {
@@ -673,4 +761,43 @@ function scrollFocusedFieldIntoView(event: React.FocusEvent<HTMLFormElement>) {
   window.setTimeout(() => {
     target.scrollIntoView({ block: "center", behavior: "smooth" });
   }, 260);
+}
+
+async function notifyClientSupportError({
+  submissionId,
+  errorType,
+  source,
+  message,
+  operation,
+  userShownOutcome,
+  fighterName,
+  fighterEmail
+}: {
+  submissionId: string;
+  errorType: string;
+  source: string;
+  message: string;
+  operation: string;
+  userShownOutcome: "failure" | "partial";
+  fighterName?: string;
+  fighterEmail?: string;
+}) {
+  try {
+    await fetch("/api/support-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        submissionId,
+        errorType,
+        source,
+        message,
+        operation,
+        userShownOutcome,
+        fighterName,
+        fighterEmail
+      })
+    });
+  } catch {
+    console.warn("Client support error notification failed.", { submissionId, source });
+  }
 }

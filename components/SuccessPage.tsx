@@ -7,13 +7,15 @@ export function SuccessPage({
   nationalPdfUrl,
   totalDue,
   documentsOnly = false,
-  fighterEmail
+  fighterEmail,
+  submissionId
 }: {
   athletePdfUrl?: string;
   nationalPdfUrl?: string;
   totalDue: number;
   documentsOnly?: boolean;
   fighterEmail: string;
+  submissionId: string;
 }) {
   return (
     <main className="app-shell">
@@ -30,6 +32,11 @@ export function SuccessPage({
             A confirmation email was sent to:
             <br />
             <strong>{fighterEmail}</strong>
+          </p>
+          <p>
+            Reference ID:
+            <br />
+            <strong>{submissionId}</strong>
           </p>
           <p>If you do not receive it within a few minutes, check your spam folder or contact support@camo-help.com.</p>
         </div>

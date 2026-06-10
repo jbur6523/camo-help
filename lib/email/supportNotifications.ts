@@ -16,6 +16,11 @@ type SupportErrorNotification = {
   message: string;
   operation: string;
   submissionId?: string;
+  fighterName?: string;
+  fighterEmail?: string;
+  promoterName?: string;
+  promotionName?: string;
+  userShownOutcome?: "none" | "failure" | "partial";
 };
 
 type PromoterRegistrationSupportPayload = {
@@ -41,8 +46,11 @@ type FighterSubmissionSupportPayload = {
   uploads: Partial<Record<UploadKey, unknown[]>>;
   submittedAt: Date;
   submissionId: string;
+  athletePdfGenerated: boolean;
+  nationalIdPdfGenerated: boolean;
   applicationEmailSent: boolean;
   medicalEmailSent: boolean;
+  fighterConfirmationEmailSent: boolean;
   promoterNotificationSent: boolean;
 };
 
@@ -95,18 +103,28 @@ export async function sendSupportErrorNotification({
   source,
   message,
   operation,
-  submissionId
+  submissionId,
+  fighterName,
+  fighterEmail,
+  promoterName,
+  promotionName,
+  userShownOutcome
 }: SupportErrorNotification) {
   return sendSupportNotification({
     source,
     subject: `CAMO Help Error: ${errorType}`,
     text: [
+      `Submission/request ID: ${submissionId || "Not available"}`,
       `Error type: ${errorType}`,
       `Route/function: ${source}`,
-      `Safe error message: ${message}`,
+      `Safe error message: ${safeErrorMessage(message)}`,
       `Timestamp: ${formatPacificDateTime(new Date())}`,
-      `Submission/request ID: ${submissionId || "Not available"}`,
-      `Operation failed: ${operation}`
+      ...(fighterName ? [`Fighter name: ${fighterName}`] : []),
+      ...(fighterEmail ? [`Fighter email: ${fighterEmail}`] : []),
+      ...(promoterName ? [`Promoter name: ${promoterName}`] : []),
+      ...(promotionName ? [`Promotion name: ${promotionName}`] : []),
+      `Operation failed: ${operation}`,
+      `User-facing outcome: ${userShownOutcome || "none"}`
     ].join("\n")
   });
 }
@@ -163,8 +181,11 @@ export async function sendSupportFighterSubmissionNotification({
   uploads,
   submittedAt,
   submissionId,
+  athletePdfGenerated,
+  nationalIdPdfGenerated,
   applicationEmailSent,
   medicalEmailSent,
+  fighterConfirmationEmailSent,
   promoterNotificationSent
 }: FighterSubmissionSupportPayload) {
   const name = fullName(application);
@@ -172,16 +193,20 @@ export async function sendSupportFighterSubmissionNotification({
     source: "app/api/submit-application POST",
     subject: `New Fighter Submission: ${name || "Unknown Fighter"}`,
     text: [
+      `Submission ID: ${submissionId}`,
       `Fighter Name: ${name || "Not provided"}`,
       `Fighter Email: ${application.email}`,
       `DOB: ${application.birthDate}`,
       `Selected Promoter: ${selectedPromoterLabel(application)}`,
+      `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
+      `Submission workflow type: ${submissionWorkflowType(application, uploads)}`,
       "Submission types selected:",
       ...fighterSubmissionTypeLines(application, uploads),
-      `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
-      `Submission ID: ${submissionId}`,
+      `Athlete License PDF generated: ${athletePdfGenerated ? "yes" : "no"}`,
+      `National MMA ID PDF generated: ${nationalIdPdfGenerated ? "yes" : "no"}`,
       `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
       `Medical email sent: ${medicalEmailSent ? "yes" : "no"}`,
+      `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`,
       `Promoter notification sent: ${promoterNotificationSent ? "yes" : "no"}`
     ].join("\n")
   });
@@ -212,4 +237,25 @@ function fighterSubmissionTypeLines(application: ApplicationData, uploads: Parti
   ];
 
   return lines.length ? lines : ["- None"];
+}
+
+function submissionWorkflowType(application: ApplicationData, uploads: Partial<Record<UploadKey, unknown[]>>) {
+  const requirementsNeeded = application.requirementsNeeded || [];
+  const hasAthlete = requirementsNeeded.includes("athleteLicenseApplication");
+  const hasNational = requirementsNeeded.includes("nationalMmaIdApplication");
+  const hasMedical = requirementsNeeded.includes("bloodwork") || requirementsNeeded.includes("physical") || Boolean(uploads.cardio?.length) || Boolean(uploads.additional?.length);
+
+  if (hasAthlete && hasNational) return "Full application";
+  if (hasAthlete && !hasNational && !hasMedical) return "Athlete License only";
+  if (hasNational && !hasAthlete && !hasMedical) return "National MMA ID only";
+  if (!hasAthlete && !hasNational && hasMedical) return "Medical documents only";
+  if (!hasAthlete && !hasNational) return "Documents-only";
+  return "Documents-only";
+}
+
+export function safeErrorMessage(message: string) {
+  return message
+    .replace(/(RESEND_API_KEY|SUPABASE_SERVICE_ROLE_KEY|ADMIN_TOKEN|ADMIN_PASSWORD|NEXT_PUBLIC_SUPABASE_ANON_KEY)=\S+/gi, "$1=[redacted]")
+    .replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]")
+    .slice(0, 500);
 }
