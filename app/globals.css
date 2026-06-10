@@ -172,6 +172,10 @@ textarea {
   line-height: 1.15;
 }
 
+.centered-step-title {
+  text-align: center;
+}
+
 .step-help {
   margin: 0 0 18px;
   color: var(--muted);
@@ -666,6 +670,12 @@ textarea {
   color: var(--ink);
 }
 
+.button.promoter-registration-button {
+  background: #f5e6e3;
+  border: 1px solid #e7c6c0;
+  color: #7a241b;
+}
+
 .button.ghost {
   background: transparent;
   color: var(--brand);
@@ -698,6 +708,14 @@ textarea {
 
 .notice p:last-child {
   margin-bottom: 0;
+}
+
+.activation-warning {
+  margin: 18px 0;
+}
+
+.payment-action {
+  margin: 18px 0;
 }
 
 .compact-list {

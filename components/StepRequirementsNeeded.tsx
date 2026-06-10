@@ -18,7 +18,7 @@ export function StepRequirementsNeeded({ form }: { form: UseFormReturn<Applicati
 
   return (
     <>
-      <h2 className="step-title">What do you still need help submitting?</h2>
+      <h2 className="step-title centered-step-title">What do you need help submitting?</h2>
       <p className="step-help">Everything is selected by default. Uncheck anything you have already submitted to CAMO.</p>
       <div className="review-block">
         {requirementOptions.map((key) => (

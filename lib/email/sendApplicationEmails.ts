@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
 import { independentPromoterId } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
@@ -257,7 +258,7 @@ export function buildPromoterNotificationBody(application: ApplicationData, subm
     `Fighter phone: ${application.phone}`,
     `Date of birth: ${application.birthDate}`,
     `Requirements submitted: ${selectedRequirementLabels(application)}`,
-    `Submission date/time: ${submittedAt.toISOString()}`,
+    `Submission date/time: ${formatPacificDateTime(submittedAt)}`,
     "",
     "No medical documents, IDs, headshots, or PDFs are included in this promoter notification."
   ].join("\n");
@@ -302,12 +303,7 @@ function medicalRequirementLines(uploads: Partial<Record<UploadKey, EmailAttachm
 }
 
 function formatEmailDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "America/Los_Angeles"
-  }).format(date);
+  return formatPacificLongDate(date);
 }
 
 function requiredEnv(name: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatPacificDateTime } from "@/lib/dates";
 import type { PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import type { PromoterStatus } from "@/lib/supabase/database.types";
 
@@ -152,5 +153,5 @@ function actionsForStatus(status: PromoterStatus): PromoterAdminAction[] {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return formatPacificDateTime(date);
 }

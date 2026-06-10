@@ -43,8 +43,12 @@ export function SuccessPage({
           </div>
         </div>
 
+        <div className="notice activation-warning">
+          Your license will not be active until CAMO receives and approves all required documents and payment.
+        </div>
+
         {totalDue > 0 ? (
-          <p>
+          <p className="payment-action">
             <a className="button primary" href={camoPaymentUrl} target="_blank" rel="noreferrer" style={{ display: "grid", placeItems: "center", textDecoration: "none" }}>
               Pay CAMO Fees
             </a>
@@ -66,10 +70,6 @@ export function SuccessPage({
               Download National MMA ID PDF
             </a>
           ) : null}
-        </div>
-
-        <div className="notice">
-          Your license will not be active until CAMO receives and approves all required documents and payment.
         </div>
       </section>
     </main>

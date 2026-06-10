@@ -1,7 +1,6 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
-import { camoPaymentUrl } from "@/lib/camoPayment";
 import type { ApplicationData } from "@/lib/types";
 import { defaultRequirementsNeeded, paymentTotal } from "@/lib/types";
 
@@ -70,10 +69,6 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
         </div>
         <div className="notice">
           <strong>Payment is separate.</strong> This app prepares and sends documents. Complete payment through CAMO after submission.
-          <br />
-          <a className="notice-link" href={camoPaymentUrl} target="_blank" rel="noreferrer">
-            Complete CAMO Payment
-          </a>
         </div>
         <p className="fine-print">
           Selected: Athlete License {athleteLicenseType || "not selected"}, National MMA ID {nationalIdType || "not selected"}.

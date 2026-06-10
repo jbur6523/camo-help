@@ -1,4 +1,5 @@
 import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
+import { todayPacificDateInput, todayPacificParts } from "@/lib/dates";
 
 export type YesNo = "" | "yes" | "no";
 
@@ -212,7 +213,7 @@ export const defaultApplicationData: ApplicationData = {
   certifyBloodworkRequirements: false,
   certifyPhysicalRequirements: false,
   signatureName: "",
-  signatureDate: new Date().toISOString().slice(0, 10)
+  signatureDate: todayPacificDateInput()
 };
 
 export function calculateAge(mmddyyyy: string) {
@@ -230,11 +231,11 @@ export function calculateAge(mmddyyyy: string) {
   ) {
     return "";
   }
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
+  const today = todayPacificParts();
+  let age = today.year - birth.getFullYear();
   const hasBirthdayPassed =
-    today.getMonth() > birth.getMonth() ||
-    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+    today.month > birth.getMonth() ||
+    (today.month === birth.getMonth() && today.day >= birth.getDate());
   if (!hasBirthdayPassed) age -= 1;
   return age >= 0 && age < 120 ? String(age) : "";
 }

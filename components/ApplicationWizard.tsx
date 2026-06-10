@@ -201,7 +201,7 @@ export function ApplicationWizard() {
             <button className="button primary" type="button" onClick={() => setStarted(true)}>
               Start Application
             </button>
-            <a className="button secondary" href="/promoter-registration">
+            <a className="button promoter-registration-button" href="/promoter-registration">
               Promoter Registration
             </a>
           </div>
