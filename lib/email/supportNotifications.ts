@@ -8,6 +8,7 @@ type SupportNotification = {
   subject: string;
   text: string;
   source: string;
+  submissionId?: string;
 };
 
 type SupportErrorNotification = {
@@ -51,12 +52,12 @@ type FighterSubmissionSupportPayload = {
   applicationEmailSent: boolean;
   medicalEmailSent: boolean;
   fighterConfirmationEmailSent: boolean;
-  promoterNotificationSent: boolean;
+  promoterNotificationStatus: "not_applicable" | "pending" | "sent" | "failed";
 };
 
 const adminPromotersPath = "/admin/promoters";
 
-export async function sendSupportNotification({ subject, text, source }: SupportNotification) {
+export async function sendSupportNotification({ subject, text, source, submissionId }: SupportNotification) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const to = process.env.SUPPORT_EMAIL_TO;
@@ -76,6 +77,11 @@ export async function sendSupportNotification({ subject, text, source }: Support
   }
 
   try {
+    console.info("Support notification send attempted.", {
+      source,
+      submissionId: submissionId || "not available",
+      timestamp: new Date().toISOString()
+    });
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from,
@@ -85,15 +91,30 @@ export async function sendSupportNotification({ subject, text, source }: Support
     });
 
     if (error) {
-      console.warn("Support notification failed.", { source, error: error.message });
+      console.warn("Support notification failed.", {
+        source,
+        submissionId: submissionId || "not available",
+        timestamp: new Date().toISOString(),
+        error: safeErrorMessage(error.message)
+      });
       return null;
     }
 
-    console.info("Support notification sent.", { source, resendMessageId: data?.id || null });
+    console.info("Support notification sent.", {
+      source,
+      submissionId: submissionId || "not available",
+      timestamp: new Date().toISOString(),
+      resendMessageId: data?.id || null
+    });
     return data?.id || null;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown support notification error.";
-    console.warn("Support notification failed.", { source, error: message });
+    console.warn("Support notification failed.", {
+      source,
+      submissionId: submissionId || "not available",
+      timestamp: new Date().toISOString(),
+      error: safeErrorMessage(message)
+    });
     return null;
   }
 }
@@ -112,6 +133,7 @@ export async function sendSupportErrorNotification({
 }: SupportErrorNotification) {
   return sendSupportNotification({
     source,
+    submissionId,
     subject: `CAMO Help Error: ${errorType}`,
     text: [
       `Submission/request ID: ${submissionId || "Not available"}`,
@@ -186,11 +208,12 @@ export async function sendSupportFighterSubmissionNotification({
   applicationEmailSent,
   medicalEmailSent,
   fighterConfirmationEmailSent,
-  promoterNotificationSent
+  promoterNotificationStatus
 }: FighterSubmissionSupportPayload) {
   const name = fullName(application);
   return sendSupportNotification({
     source: "app/api/submit-application POST",
+    submissionId,
     subject: `New Fighter Submission: ${name || "Unknown Fighter"}`,
     text: [
       `Submission ID: ${submissionId}`,
@@ -207,7 +230,7 @@ export async function sendSupportFighterSubmissionNotification({
       `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
       `Medical email sent: ${medicalEmailSent ? "yes" : "no"}`,
       `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`,
-      `Promoter notification sent: ${promoterNotificationSent ? "yes" : "no"}`
+      `Promoter notification status: ${promoterNotificationStatus}`
     ].join("\n")
   });
 }

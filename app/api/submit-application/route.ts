@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { NoSelectedEmailAttachmentsError, sendApplicationEmails, SubmissionEmailDeliveryError } from "@/lib/email/sendApplicationEmails";
+import {
+  NoSelectedEmailAttachmentsError,
+  sendApplicationEmails,
+  sendPromoterNotificationEmail,
+  SubmissionEmailDeliveryError
+} from "@/lib/email/sendApplicationEmails";
 import {
   sendSupportErrorNotification,
   sendSupportFighterSubmissionNotification
@@ -8,6 +13,7 @@ import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName } from "@/lib/types";
+import { independentPromoterId } from "@/lib/promoters/constants";
 
 export const runtime = "nodejs";
 
@@ -77,10 +83,12 @@ export async function POST(request: Request) {
       applicationEmailSent: Boolean(result.applicationRecipient),
       medicalEmailSent: Boolean(result.medicalRecipient),
       fighterConfirmationEmailSent: Boolean(result.fighterConfirmationRecipient),
-      promoterNotificationSent: Boolean(result.promoterRecipient)
+      promoterNotificationStatus: promoterNotificationStatusBeforeSend(application)
     });
 
-    return NextResponse.json({ ok: true, submissionId, ...result });
+    const promoterRecipient = await sendPromoterNotificationEmail(application, submissionId);
+
+    return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
     const isPartial = error instanceof SubmissionEmailDeliveryError && error.sentKinds.length > 0;
@@ -146,4 +154,9 @@ function classifySubmissionError(message: string, error: unknown) {
   if (message.startsWith("Resend email failed")) return "Email Sending Failure";
   if (message.toLowerCase().includes("formdata") || message.toLowerCase().includes("file")) return "Upload Parsing Failure";
   return "Fighter Submission Failure";
+}
+
+function promoterNotificationStatusBeforeSend(application: ApplicationData) {
+  if (!application.selectedPromoterId || application.selectedPromoterId === independentPromoterId) return "not_applicable";
+  return "pending";
 }

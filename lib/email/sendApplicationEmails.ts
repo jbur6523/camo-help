@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
-import { sendSupportErrorNotification } from "@/lib/email/supportNotifications";
+import { safeErrorMessage, sendSupportErrorNotification } from "@/lib/email/supportNotifications";
 import { independentPromoterId } from "@/lib/promoters/constants";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
@@ -85,6 +85,7 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     console.info("Submission email send attempted.", {
       submissionId,
       kind: message.kind,
+      timestamp: new Date().toISOString(),
       attachmentCount: message.attachments.length
     });
     let resendMessageId: string | null;
@@ -98,6 +99,12 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Submission email failed.";
+      console.warn("Submission email send failed.", {
+        submissionId,
+        kind: message.kind,
+        timestamp: new Date().toISOString(),
+        error: safeErrorMessage(errorMessage)
+      });
       throw new SubmissionEmailDeliveryError({
         failedKind: message.kind,
         sentKinds,
@@ -109,17 +116,16 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     console.info("Submission email send completed.", {
       submissionId,
       kind: message.kind,
+      timestamp: new Date().toISOString(),
       resendMessageId
     });
   }
 
-  const promoterRecipient = await sendPromoterNotificationEmail(resend, from, payload.application, submissionId);
   const fighterConfirmationRecipient = await sendFighterConfirmationEmail(resend, from, payload.application, submissionId);
 
   return {
     applicationRecipient: messages.some((message) => message.kind === "application") ? applicationRecipient : null,
     medicalRecipient: messages.some((message) => message.kind === "medical") ? medicalRecipient : null,
-    promoterRecipient,
     fighterConfirmationRecipient,
     resendMessageIds,
     betaMode
@@ -212,11 +218,29 @@ function delay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function sendPromoterNotificationEmail(resend: Resend, from: string, application: ApplicationData, submissionId: string) {
+export async function sendPromoterNotificationEmail(application: ApplicationData, submissionId: string) {
   const selectedPromoterId = application.selectedPromoterId;
   if (!selectedPromoterId || selectedPromoterId === independentPromoterId) return null;
 
   try {
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.EMAIL_FROM;
+    if (!apiKey || !from) {
+      console.warn("Promoter notification skipped: required email environment is missing.", {
+        submissionId,
+        timestamp: new Date().toISOString()
+      });
+      await sendSupportErrorNotification({
+        errorType: "Missing Required Environment Variable",
+        source: "sendPromoterNotificationEmail",
+        message: "RESEND_API_KEY or EMAIL_FROM is not configured.",
+        operation: "Send promoter fighter-submission notification",
+        submissionId
+      });
+      return null;
+    }
+
+    const resend = new Resend(apiKey);
     const { createSupabaseServiceRoleClient } = await import("@/lib/supabase/server");
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error } = await supabase
@@ -227,7 +251,11 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       .maybeSingle();
 
     if (error) {
-      console.warn(`Promoter notification skipped: ${error.message}`);
+      console.warn("Promoter notification skipped.", {
+        submissionId,
+        timestamp: new Date().toISOString(),
+        error: safeErrorMessage(error.message)
+      });
       await sendSupportErrorNotification({
         errorType: "Supabase Promoter Fetch Failure",
         source: "sendPromoterNotificationEmail",
@@ -239,11 +267,18 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
     }
 
     if (!promoter || promoter.status !== "active" || !promoter.email) {
-      console.warn(`Promoter notification skipped: selected promoter is not active (${selectedPromoterId}).`);
+      console.warn("Promoter notification skipped: selected promoter is not active.", {
+        submissionId,
+        selectedPromoterId,
+        timestamp: new Date().toISOString()
+      });
       return null;
     }
 
-    console.info("Promoter notification send attempted.", { submissionId });
+    console.info("Promoter notification send attempted.", {
+      submissionId,
+      timestamp: new Date().toISOString()
+    });
     const { data, error: emailError } = await resend.emails.send({
       from,
       to: promoter.email,
@@ -252,7 +287,11 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
     });
 
     if (emailError) {
-      console.warn(`Promoter notification email failed: ${emailError.message}`);
+      console.warn("Promoter notification email failed.", {
+        submissionId,
+        timestamp: new Date().toISOString(),
+        error: safeErrorMessage(emailError.message)
+      });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
         source: "sendPromoterNotificationEmail",
@@ -263,11 +302,19 @@ async function sendPromoterNotificationEmail(resend: Resend, from: string, appli
       return null;
     }
 
-    console.info("Promoter notification send completed.", { submissionId, resendMessageId: data?.id || null });
+    console.info("Promoter notification send completed.", {
+      submissionId,
+      timestamp: new Date().toISOString(),
+      resendMessageId: data?.id || null
+    });
     return promoter.email as string;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown promoter notification error.";
-    console.warn(`Promoter notification skipped: ${message}`);
+    console.warn("Promoter notification skipped.", {
+      submissionId,
+      timestamp: new Date().toISOString(),
+      error: safeErrorMessage(message)
+    });
     await sendSupportErrorNotification({
       errorType: "Promoter Notification Failure",
       source: "sendPromoterNotificationEmail",
@@ -283,7 +330,10 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
   if (!application.email) return null;
 
   try {
-    console.info("Fighter confirmation email send attempted.", { submissionId });
+    console.info("Fighter confirmation email send attempted.", {
+      submissionId,
+      timestamp: new Date().toISOString()
+    });
     const { data, error } = await resend.emails.send({
       from,
       to: application.email,
@@ -302,7 +352,11 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
     });
 
     if (error) {
-      console.warn(`Fighter confirmation email failed: ${error.message}`);
+      console.warn("Fighter confirmation email failed.", {
+        submissionId,
+        timestamp: new Date().toISOString(),
+        error: safeErrorMessage(error.message)
+      });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
         source: "sendFighterConfirmationEmail",
@@ -313,11 +367,19 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
       return null;
     }
 
-    console.info("Fighter confirmation email send completed.", { submissionId, resendMessageId: data?.id || null });
+    console.info("Fighter confirmation email send completed.", {
+      submissionId,
+      timestamp: new Date().toISOString(),
+      resendMessageId: data?.id || null
+    });
     return application.email;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown fighter confirmation email error.";
-    console.warn(`Fighter confirmation email failed: ${message}`);
+    console.warn("Fighter confirmation email failed.", {
+      submissionId,
+      timestamp: new Date().toISOString(),
+      error: safeErrorMessage(message)
+    });
     await sendSupportErrorNotification({
       errorType: "Email Sending Failure",
       source: "sendFighterConfirmationEmail",

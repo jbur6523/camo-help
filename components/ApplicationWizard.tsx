@@ -98,6 +98,7 @@ export function ApplicationWizard() {
   const [finalEmailError, setFinalEmailError] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [submittedSubmissionId, setSubmittedSubmissionId] = useState("");
+  const [fighterConfirmationEmailSent, setFighterConfirmationEmailSent] = useState(false);
   const [pendingSubmissionId, setPendingSubmissionId] = useState("");
   const [submissionFailure, setSubmissionFailure] = useState<SubmissionFailure | null>(null);
   const submissionInFlightRef = useRef(false);
@@ -170,6 +171,7 @@ export function ApplicationWizard() {
         documentsOnly={documentsOnly}
         fighterEmail={submittedEmail || data.email}
         submissionId={submittedSubmissionId}
+        fighterConfirmationEmailSent={fighterConfirmationEmailSent}
       />
     );
   }
@@ -558,6 +560,7 @@ export function ApplicationWizard() {
       window.localStorage.removeItem(storageKey);
       setSubmittedEmail(values.email);
       setSubmittedSubmissionId(result.submissionId || submissionId);
+      setFighterConfirmationEmailSent(Boolean(result.fighterConfirmationRecipient));
       setSubmitted(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Submission failed.";

@@ -8,7 +8,8 @@ export function SuccessPage({
   totalDue,
   documentsOnly = false,
   fighterEmail,
-  submissionId
+  submissionId,
+  fighterConfirmationEmailSent
 }: {
   athletePdfUrl?: string;
   nationalPdfUrl?: string;
@@ -16,6 +17,7 @@ export function SuccessPage({
   documentsOnly?: boolean;
   fighterEmail: string;
   submissionId: string;
+  fighterConfirmationEmailSent: boolean;
 }) {
   return (
     <main className="app-shell">
@@ -28,17 +30,26 @@ export function SuccessPage({
             : "Your application documents have been prepared and sent. The last step is to complete payment through CAMO."}
         </p>
         <div className="notice confirmation-email-notice">
-          <p>
-            A confirmation email was sent to:
-            <br />
-            <strong>{fighterEmail}</strong>
-          </p>
+          {fighterConfirmationEmailSent ? (
+            <p>
+              A confirmation email was sent to:
+              <br />
+              <strong>{fighterEmail}</strong>
+            </p>
+          ) : (
+            <>
+              <p>Your documents were submitted to CAMO.</p>
+              <p>We were unable to send your confirmation email. Please save this reference ID:</p>
+            </>
+          )}
           <p>
             Reference ID:
             <br />
             <strong>{submissionId}</strong>
           </p>
-          <p>If you do not receive it within a few minutes, check your spam folder or contact support@camo-help.com.</p>
+          {fighterConfirmationEmailSent ? (
+            <p>If you do not receive it within a few minutes, check your spam folder or contact support@camo-help.com.</p>
+          ) : null}
         </div>
 
         <div className="fee-box">
