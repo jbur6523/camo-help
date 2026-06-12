@@ -182,6 +182,10 @@ textarea {
   line-height: 1.4;
 }
 
+.registration-back-link {
+  margin-bottom: 12px;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr;

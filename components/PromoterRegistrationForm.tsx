@@ -25,12 +25,13 @@ export function PromoterRegistrationForm() {
   return (
     <main className="app-shell">
       <section className="wizard-body registration-page">
-        <a className="button ghost" href="/">
+        <a className="button ghost registration-back-link" href="/">
           Back to application
         </a>
         <h1 className="step-title">Promoter Registration</h1>
         <p className="step-help">
-          Submit your promotion for review. Approved promotions may be listed for fighters in a future app update.
+          Submit your promotion for review. Once approved, your promotion will appear for selection on the fighter application and you
+          will receive updates when your fighters submit CAMO paperwork.
         </p>
 
         {submitted ? (
