@@ -808,7 +808,7 @@ function GenerateStep({
         </section>
         {!hasCurrentGeneratedForms ? (
           <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
-            {isBusy ? "Working..." : "Confirm Email & Generate Forms"}
+            {isBusy ? "Working..." : documentsOnly ? "Confirm Email & Submit Documents" : "Confirm Email & Generate Forms"}
           </button>
         ) : null}
         {hasCurrentGeneratedForms ? (
