@@ -134,7 +134,7 @@ function UploadTile({
         className="upload-file-input"
         type="file"
         accept={isCameraUpload ? identityPhotoAcceptedTypes : acceptedTypes}
-        capture={uploadKey === "headshot" ? "user" : uploadKey === "photoId" ? "environment" : undefined}
+        capture={isCameraUpload ? "environment" : undefined}
         multiple={multiple}
         onChange={(event) => {
           const selectedFiles = Array.from(event.currentTarget.files || []);
@@ -183,8 +183,8 @@ function uploadHelperText(key: UploadKey) {
 }
 
 function pickerLabel(key: UploadKey, hasFiles: boolean, multiple: boolean) {
-  if (hasFiles) return multiple ? "Add additional file" : key === "headshot" ? "Retake Selfie Photo" : key === "photoId" ? "Retake ID Photo" : "Replace file";
-  if (key === "headshot") return "Take Selfie Photo";
+  if (hasFiles) return multiple ? "Add additional file" : key === "headshot" ? "Retake Headshot Photo" : key === "photoId" ? "Retake ID Photo" : "Replace file";
+  if (key === "headshot") return "Take Headshot Photo";
   if (key === "photoId") return "Take ID Photo";
   return "Choose file";
 }
