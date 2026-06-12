@@ -246,6 +246,13 @@ textarea {
   line-height: 1.35;
 }
 
+.field .promoter-id-helper {
+  color: #3f4a45;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .error {
   color: var(--danger);
   font-size: 12px;

@@ -58,7 +58,9 @@ export function PromoterRegistrationForm() {
               value={form.lastPromotionDate}
               error={errors.lastPromotionDate}
               onChange={handleChange}
-              type="date"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="MM/DD/YYYY"
               required
             />
             <RegistrationField
@@ -105,7 +107,8 @@ export function PromoterRegistrationForm() {
   );
 
   function handleChange(name: FieldName, value: string) {
-    setForm((current) => ({ ...current, [name]: value }));
+    const nextValue = name === "lastPromotionDate" ? formatPromoterDateInput(value) : value;
+    setForm((current) => ({ ...current, [name]: nextValue }));
     setErrors((current) => ({ ...current, [name]: "" }));
     setGlobalMessage("");
   }
@@ -161,6 +164,8 @@ function RegistrationField({
   error,
   onChange,
   type = "text",
+  inputMode,
+  maxLength,
   placeholder,
   required = false
 }: {
@@ -170,6 +175,8 @@ function RegistrationField({
   error?: string;
   onChange: (name: FieldName, value: string) => void;
   type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
   placeholder?: string;
   required?: boolean;
 }) {
@@ -181,6 +188,8 @@ function RegistrationField({
         name={name}
         type={type}
         value={value}
+        inputMode={inputMode}
+        maxLength={maxLength}
         placeholder={placeholder}
         required={required}
         onChange={(event) => onChange(name, event.currentTarget.value)}
@@ -202,7 +211,7 @@ function GovernmentIdField({
   return (
     <div className="field">
       <label htmlFor="governmentId">Driver License / Government-Issued ID</label>
-      <small>The name on the ID should match the promoter name registered on CAMO.</small>
+      <small className="promoter-id-helper">The name on the ID should match the promoter name registered on CAMO.</small>
       <input
         id="governmentId"
         name="governmentId"
@@ -222,4 +231,11 @@ function toFieldErrors(fieldErrors: Partial<Record<string, string[]>>) {
   return Object.fromEntries(
     Object.entries(fieldErrors).map(([key, messages]) => [key, messages?.[0] || ""])
   ) as FieldErrors;
+}
+
+function formatPromoterDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
