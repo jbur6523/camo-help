@@ -110,7 +110,7 @@ export function StepFighterHistory({ form }: { form: UseFormReturn<ApplicationDa
                     {index >= recordTotal ? <span>Saved, not required</span> : null}
                   </div>
                   <Field
-                    label="Promoter"
+                    label="Promoter/Promotion"
                     name={`fights.${index}.promoter`}
                     register={register}
                     errors={formState.errors}
