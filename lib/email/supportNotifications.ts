@@ -7,6 +7,7 @@ import { fullName, requirementLabels } from "@/lib/types";
 type SupportNotification = {
   subject: string;
   text: string;
+  html?: string;
   source: string;
   submissionId?: string;
   attachments?: SupportEmailAttachment[];
@@ -64,9 +65,9 @@ type FighterSubmissionSupportPayload = {
   promoterNotificationStatus: "not_applicable" | "pending" | "sent" | "failed";
 };
 
-const adminPromotersPath = "/admin/promoters";
+const adminPromotersUrl = "https://camo-help.com/admin/promoters";
 
-export async function sendSupportNotification({ subject, text, source, submissionId, attachments }: SupportNotification) {
+export async function sendSupportNotification({ subject, text, html, source, submissionId, attachments }: SupportNotification) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const to = process.env.SUPPORT_EMAIL_TO;
@@ -97,6 +98,7 @@ export async function sendSupportNotification({ subject, text, source, submissio
       to,
       subject,
       text,
+      ...(html ? { html } : {}),
       ...(attachments?.length
         ? {
             attachments: attachments.map((attachment) => ({
@@ -192,8 +194,19 @@ export async function sendSupportPromoterRegistrationNotification({
       `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
       "Status: pending",
       `Government ID attachment: ${governmentIdAttachment ? governmentIdAttachment.filename : "Not attached"}`,
-      `Admin review path: ${adminPromotersPath}`
+      "",
+      "Admin Review",
+      `Review Promoter Registration: ${adminPromotersUrl}`
     ].join("\n"),
+    html: buildPromoterRegistrationSupportHtml({
+      promotionName,
+      lastPromotionDate,
+      promoterEmail,
+      contactName,
+      websiteUrl,
+      submittedAt,
+      governmentIdAttachment
+    }),
     attachments: governmentIdAttachment ? [governmentIdAttachment] : undefined
   });
 }
@@ -216,9 +229,71 @@ export async function sendSupportPromoterStatusChangeNotification({
       `Old status: ${oldStatus}`,
       `New status: ${newStatus}`,
       `Date/time of change: ${formatPacificDateTime(changedAt)}`,
-      `Admin review path: ${adminPromotersPath}`
+      `Admin review path: ${adminPromotersUrl}`
     ].join("\n")
   });
+}
+
+function buildPromoterRegistrationSupportHtml({
+  promotionName,
+  lastPromotionDate,
+  promoterEmail,
+  contactName,
+  websiteUrl,
+  submittedAt,
+  governmentIdAttachment
+}: PromoterRegistrationSupportPayload) {
+  const details = [
+    ["Promotion Name", promotionName],
+    ["Date of Last Promotion", lastPromotionDate],
+    ["Promoter Name", contactName],
+    ["Promoter Email", promoterEmail],
+    ["Website / Social Link", websiteUrl],
+    ["Submitted Date/Time", formatPacificDateTime(submittedAt)],
+    ["Status", "pending"],
+    ["Government ID Attachment", governmentIdAttachment ? governmentIdAttachment.filename : "Not attached"]
+  ];
+
+  return `
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f6f8f7;color:#1d2529;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:640px;margin:0 auto;padding:24px 16px;">
+      <div style="background:#ffffff;border:1px solid #d9e0dc;border-radius:10px;padding:22px;">
+        <h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:#0f6b4f;">New Promoter Registration Pending Review</h1>
+        <p style="margin:0 0 22px;font-size:16px;line-height:1.5;color:#3f4a45;">
+          A new promoter registration has been submitted and is waiting for admin review.
+        </p>
+
+        <h2 style="margin:0 0 12px;font-size:17px;line-height:1.3;color:#1d2529;">Promoter Details</h2>
+        <table role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 24px;">
+          <tbody>
+            ${details
+              .map(
+                ([label, value]) => `
+            <tr>
+              <td style="display:block;padding:10px 0 2px;font-size:13px;font-weight:700;color:#1d2529;">${escapeHtml(label)}</td>
+              <td style="display:block;padding:0 0 10px;border-bottom:1px solid #edf1ef;font-size:15px;line-height:1.45;color:#3f4a45;">${escapeHtml(value || "Not provided")}</td>
+            </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+
+        <h2 style="margin:0 0 12px;font-size:17px;line-height:1.3;color:#1d2529;">Admin Review</h2>
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#3f4a45;">Review this promoter registration:</p>
+        <p style="margin:0 0 16px;">
+          <a href="${adminPromotersUrl}" style="display:inline-block;background:#0f6b4f;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 18px;font-weight:700;font-size:15px;">
+            Review Promoter Registration
+          </a>
+        </p>
+        <p style="margin:0;font-size:14px;line-height:1.5;">
+          <a href="${adminPromotersUrl}" style="color:#0f6b4f;text-decoration:underline;">${adminPromotersUrl}</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 export async function sendSupportFighterSubmissionNotification({
@@ -318,4 +393,13 @@ export function safeErrorMessage(message: string) {
     .replace(/(RESEND_API_KEY|SUPABASE_SERVICE_ROLE_KEY|ADMIN_TOKEN|ADMIN_PASSWORD|NEXT_PUBLIC_SUPABASE_ANON_KEY)=\S+/gi, "$1=[redacted]")
     .replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]")
     .slice(0, 500);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
