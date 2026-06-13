@@ -127,12 +127,12 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
 
   drawSection("Certified Documents");
   input.certifiedDocuments.forEach((documentName) => drawText(`- ${documentName}`));
+  y -= 4;
+  drawRow("Document completed:", formatPacificLongDate(input.submittedAt));
 
   drawSection("Confirmation Info");
   drawText("Confirmation checkbox language accepted during submission:", { font: boldFont });
   signatureConfirmationCheckboxLanguage.forEach((line) => drawText(`- ${line}`));
-  y -= 4;
-  drawRow("Document completed:", formatPacificLongDate(input.submittedAt));
   y -= 2;
   drawText("Certification statement:", { font: boldFont });
   drawText(signatureCertificationStatement);
