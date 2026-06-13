@@ -65,7 +65,6 @@ export async function POST(request: Request) {
     applicationForError = application;
     deliveryState.completedStep = "application_payload_parsed";
     const ipAddress = clientIpFromHeaders(request.headers);
-    const userAgent = request.headers.get("user-agent") || "Unavailable";
     const approximateIpLocation = approximateIpLocationFromHeaders(request.headers);
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
@@ -97,7 +96,6 @@ export async function POST(request: Request) {
           application,
           certifiedDocuments,
           ipAddress,
-          userAgent,
           approximateIpLocation
         })
       : undefined;
@@ -238,7 +236,6 @@ async function signatureCertificateAttachment({
   application,
   certifiedDocuments,
   ipAddress,
-  userAgent,
   approximateIpLocation
 }: {
   submissionId: string;
@@ -246,7 +243,6 @@ async function signatureCertificateAttachment({
   application: ApplicationData;
   certifiedDocuments: string[];
   ipAddress: string;
-  userAgent: string;
   approximateIpLocation: ApproximateIpLocation;
 }) {
   try {
@@ -256,7 +252,6 @@ async function signatureCertificateAttachment({
       application,
       certifiedDocuments,
       ipAddress,
-      userAgent,
       approximateIpLocation
     });
     console.info("Signature certificate PDF generated.", {

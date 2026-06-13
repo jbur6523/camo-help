@@ -1,5 +1,5 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { formatPacificDateTime } from "@/lib/dates";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
 import {
   signatureCertificationStatement,
   signatureConfirmationCheckboxLanguage,
@@ -14,7 +14,6 @@ export type SignatureCertificateInput = {
   application: ApplicationData;
   certifiedDocuments: string[];
   ipAddress: string;
-  userAgent: string;
   approximateIpLocation: ApproximateIpLocation;
 };
 
@@ -24,7 +23,9 @@ const margin = 54;
 const bodySize = 10.5;
 const headingSize = 13;
 const titleSize = 22;
-const lineHeight = 15;
+const subtitleSize = 12;
+const lineHeight = 14;
+const labelWidth = 132;
 
 export async function generateSignatureCertificatePdf(input: SignatureCertificateInput) {
   const pdfDoc = await PDFDocument.create();
@@ -33,17 +34,20 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
-  const drawText = (text: string, options: { font?: PDFFont; size?: number; indent?: number } = {}) => {
+  const ensureSpace = (height: number) => {
+    if (y >= margin + height) return;
+    page = pdfDoc.addPage([pageWidth, pageHeight]);
+    y = pageHeight - margin;
+  };
+
+  const drawText = (text: string, options: { font?: PDFFont; size?: number; indent?: number; gapAfter?: number } = {}) => {
     const font = options.font || regularFont;
     const size = options.size || bodySize;
     const indent = options.indent || 0;
     const maxWidth = pageWidth - margin * 2 - indent;
     const lines = wrapText(text, font, size, maxWidth);
     for (const line of lines) {
-      if (y < margin + lineHeight) {
-        page = pdfDoc.addPage([pageWidth, pageHeight]);
-        y = pageHeight - margin;
-      }
+      ensureSpace(lineHeight);
       page.drawText(line, {
         x: margin + indent,
         y,
@@ -53,22 +57,45 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
       });
       y -= lineHeight;
     }
+    y -= options.gapAfter || 0;
   };
 
   const drawSection = (title: string) => {
-    y -= 8;
-    if (y < margin + 44) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-    }
+    y -= 12;
+    ensureSpace(42);
     page.drawLine({
-      start: { x: margin, y: y + 7 },
-      end: { x: pageWidth - margin, y: y + 7 },
+      start: { x: margin, y },
+      end: { x: pageWidth - margin, y },
       thickness: 0.8,
       color: rgb(0.72, 0.76, 0.74)
     });
+    y -= 18;
     drawText(title, { font: boldFont, size: headingSize });
-    y -= 2;
+    y -= 4;
+  };
+
+  const drawRow = (label: string, value: string) => {
+    ensureSpace(lineHeight * 2);
+    const valueX = margin + labelWidth;
+    const valueMaxWidth = pageWidth - margin - valueX;
+    const valueLines = wrapText(value || "Not provided", regularFont, bodySize, valueMaxWidth);
+    page.drawText(label, {
+      x: margin,
+      y,
+      size: bodySize,
+      font: boldFont,
+      color: rgb(0.08, 0.1, 0.12)
+    });
+    valueLines.forEach((line, index) => {
+      page.drawText(line, {
+        x: valueX,
+        y: y - index * lineHeight,
+        size: bodySize,
+        font: regularFont,
+        color: rgb(0.08, 0.1, 0.12)
+      });
+    });
+    y -= Math.max(1, valueLines.length) * lineHeight + 3;
   };
 
   page.drawText("Certificate of Signature", {
@@ -78,67 +105,39 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
     font: boldFont,
     color: rgb(0.02, 0.35, 0.25)
   });
-  y -= 28;
-  drawText(
-    "This certificate records the signature and submission information collected by CAMO Help. CAMO may require additional verification or official signing if needed."
-  );
+  y -= 20;
+  page.drawText("camo-help.com", {
+    x: margin,
+    y,
+    size: subtitleSize,
+    font: boldFont,
+    color: rgb(0.08, 0.1, 0.12)
+  });
+  y -= 22;
+  drawText("This certificate records the signature and submission information collected by camo-help.com", { gapAfter: 8 });
 
-  drawSection("Submission Info");
-  drawLabelValue(page, boldFont, regularFont, "Reference ID:", input.submissionId, y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Date/time submitted:", formatPacificDateTime(input.submittedAt), y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "UTC timestamp:", input.submittedAt.toISOString(), y);
-  y -= lineHeight;
+  drawRow("Reference ID:", input.submissionId);
+  drawRow("Signer:", input.application.signatureName || fullName(input.application));
+  drawRow("Time of signature:", formatPacificDateTime(input.submittedAt));
+  drawRow("IP address:", input.ipAddress || "Unavailable");
+  drawRow("IP Location:", input.approximateIpLocation.display || "Unavailable");
+  y -= 4;
+  drawRow("Email used:", input.application.email || "Not provided");
+  drawRow("Phone number:", input.application.phone || "Not provided");
 
   drawSection("Certified Documents");
   input.certifiedDocuments.forEach((documentName) => drawText(`- ${documentName}`));
 
-  drawSection("Signer Info");
-  drawLabelValue(page, boldFont, regularFont, "Typed legal name:", input.application.signatureName || fullName(input.application), y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Email used:", input.application.email || "Not provided", y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Phone number:", input.application.phone || "Not provided", y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Date of birth:", input.application.birthDate || "Not provided", y);
-  y -= lineHeight;
-
-  drawSection("Audit Info");
-  drawLabelValue(page, boldFont, regularFont, "IP address:", input.ipAddress || "Unavailable", y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Approximate Location by IP:", input.approximateIpLocation.display || "Unavailable", y);
-  y -= lineHeight;
-  drawLabelValue(page, boldFont, regularFont, "Approximate IP coordinates:", formatApproximateIpCoordinates(input.approximateIpLocation), y);
-  y -= lineHeight;
-  drawText("Device/browser information:", { font: boldFont });
-  drawText(input.userAgent || "Unavailable", { indent: 14 });
-
-  drawSection("Confirmation");
+  drawSection("Confirmation Info");
   drawText("Confirmation checkbox language accepted during submission:", { font: boldFont });
   signatureConfirmationCheckboxLanguage.forEach((line) => drawText(`- ${line}`));
-  y -= 3;
+  y -= 4;
+  drawRow("Document completed:", formatPacificLongDate(input.submittedAt));
+  y -= 2;
   drawText("Certification statement:", { font: boldFont });
   drawText(signatureCertificationStatement);
 
   return pdfDoc.save();
-}
-
-function drawLabelValue(page: PDFPage, boldFont: PDFFont, regularFont: PDFFont, label: string, value: string, y: number) {
-  page.drawText(label, {
-    x: margin,
-    y,
-    size: bodySize,
-    font: boldFont,
-    color: rgb(0.08, 0.1, 0.12)
-  });
-  page.drawText(value, {
-    x: margin + 164,
-    y,
-    size: bodySize,
-    font: regularFont,
-    color: rgb(0.08, 0.1, 0.12)
-  });
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
@@ -158,11 +157,4 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 
   if (current) lines.push(current);
   return lines.length ? lines : [""];
-}
-
-function formatApproximateIpCoordinates(location: ApproximateIpLocation) {
-  if (location.latitude && location.longitude) {
-    return `${location.latitude}, ${location.longitude}`;
-  }
-  return "Unavailable";
 }
