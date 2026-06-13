@@ -305,8 +305,7 @@ export async function sendSupportFighterSubmissionNotification({
   nationalIdPdfGenerated,
   applicationEmailSent,
   medicalEmailSent,
-  fighterConfirmationEmailSent,
-  promoterNotificationStatus
+  fighterConfirmationEmailSent
 }: FighterSubmissionSupportPayload) {
   const name = fullName(application);
   return sendSupportNotification({
@@ -339,8 +338,7 @@ export async function sendSupportFighterSubmissionNotification({
       `National MMA ID PDF generated: ${nationalIdPdfGenerated ? "yes" : "no"}`,
       `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
       `Medical email sent: ${medicalEmailSent ? "yes" : "no"}`,
-      `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`,
-      `Promoter notification status: ${promoterNotificationStatus}`
+      `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`
     ].join("\n")
   });
 }
