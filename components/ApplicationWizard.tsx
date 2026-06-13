@@ -60,6 +60,8 @@ const fullWorkflowSteps: StepId[] = [
 
 const documentsOnlySteps: StepId[] = ["requirements", "applicantInfo", "uploads", "review", "generate"];
 
+const nationalIdOnlySteps: StepId[] = ["requirements", "applicantInfo", "applicationType", "uploads", "review", "generate"];
+
 const stepLabels: Record<StepId, string> = {
   requirements: "Requirements Needed",
   applicantInfo: "Applicant Info",
@@ -151,7 +153,9 @@ export function ApplicationWizard() {
   const { watch, setValue, reset } = form;
   const data = watch();
   const documentsOnly = isDocumentsOnly(data);
-  const activeSteps = documentsOnly ? documentsOnlySteps : fullWorkflowSteps;
+  const nationalIdOnly = isNationalIdOnly(data);
+  const needsAthleteLicense = needsAthleteLicenseApplication(data);
+  const activeSteps = documentsOnly ? documentsOnlySteps : nationalIdOnly ? nationalIdOnlySteps : fullWorkflowSteps;
   const activeStepIndex = Math.max(activeSteps.indexOf(step), 0);
 
   useEffect(() => {
@@ -279,7 +283,9 @@ export function ApplicationWizard() {
         {step === "requirements" ? (
           <StepRequirementsNeeded form={form} rememberedSubmittedRequirements={rememberedSubmittedRequirements} />
         ) : null}
-        {step === "applicantInfo" ? <StepApplicantInfo form={form} short={documentsOnly} /> : null}
+        {step === "applicantInfo" ? (
+          <StepApplicantInfo form={form} mode={documentsOnly ? "documentsOnly" : nationalIdOnly ? "nationalIdOnly" : "full"} />
+        ) : null}
         {step === "applicationType" ? <StepApplicationType form={form} /> : null}
         {step === "fighterHistory" ? <StepFighterHistory form={form} /> : null}
         {step === "commissionHistory" ? <StepCommissionHistory form={form} /> : null}
@@ -287,7 +293,9 @@ export function ApplicationWizard() {
         {step === "uploads" ? (
           <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} />
         ) : null}
-        {step === "review" ? <StepReview form={form} uploadFiles={uploadFiles} documentsOnly={documentsOnly} onEdit={setStep} /> : null}
+        {step === "review" ? (
+          <StepReview form={form} uploadFiles={uploadFiles} documentsOnly={documentsOnly} needsAthleteLicense={needsAthleteLicense} onEdit={setStep} />
+        ) : null}
         {step === "generate" ? (
           <GenerateStep
             pdfs={pdfs}
@@ -359,11 +367,12 @@ export function ApplicationWizard() {
 
   async function validateStep(currentStep: StepId) {
     const values = form.getValues();
+    const currentNeedsAthleteLicense = (values.requirementsNeeded || []).includes("athleteLicenseApplication");
     const requireFields: Array<keyof ApplicationData> =
       currentStep === "requirements"
         ? ["requirementsNeeded"]
         : currentStep === "applicantInfo"
-          ? documentsOnly
+          ? documentsOnly || nationalIdOnly
             ? ["firstName", "lastName", "birthDate", "phone", "email"]
             : [
                 "firstName",
@@ -384,7 +393,10 @@ export function ApplicationWizard() {
                 "weight"
               ]
         : currentStep === "applicationType"
-          ? ["athleteLicenseType", "nationalIdType"]
+          ? [
+              ...((values.requirementsNeeded || []).includes("athleteLicenseApplication") ? ["athleteLicenseType" as const] : []),
+              ...((values.requirementsNeeded || []).includes("nationalMmaIdApplication") ? ["nationalIdType" as const] : [])
+            ]
         : currentStep === "review"
           ? documentsOnly
             ? ["certifyHelperOnly"]
@@ -417,11 +429,11 @@ export function ApplicationWizard() {
 
     if (currentStep === "applicantInfo") {
       if (!calculateAge(values.birthDate)) return fail("Enter a real birth date as MM/DD/YYYY.");
-      if (!documentsOnly && !isValidAge(values.age)) return fail("Enter a valid age.");
+      if (currentNeedsAthleteLicense && !isValidAge(values.age)) return fail("Enter a valid age.");
       if (!/^\S+@\S+\.\S+$/.test(values.email)) return fail("Enter a valid email address.");
-      if (!documentsOnly && /p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
-      if (!documentsOnly && !/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
-      if (!documentsOnly && !isValidHeightInches(values.heightInches)) return fail("Height inches must be between 0 and 12.");
+      if (currentNeedsAthleteLicense && /p\.?\s*o\.?\s*box/i.test(values.street)) return fail("Street address cannot be a PO Box.");
+      if (currentNeedsAthleteLicense && !/^\d{4}$/.test(values.ssnLast4)) return fail("Enter exactly the last 4 digits of SSN.");
+      if (currentNeedsAthleteLicense && !isValidHeightInches(values.heightInches)) return fail("Height inches must be between 0 and 12.");
     }
 
     if (currentStep === "fighterHistory") {
@@ -1133,6 +1145,16 @@ function createSubmissionId() {
 function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {
   const requirementsNeeded = data.requirementsNeeded || defaultApplicationData.requirementsNeeded;
   return !requirementsNeeded.includes("athleteLicenseApplication") && !requirementsNeeded.includes("nationalMmaIdApplication");
+}
+
+function isNationalIdOnly(data: Pick<ApplicationData, "requirementsNeeded">) {
+  const requirementsNeeded = data.requirementsNeeded || defaultApplicationData.requirementsNeeded;
+  return requirementsNeeded.includes("nationalMmaIdApplication") && !requirementsNeeded.includes("athleteLicenseApplication");
+}
+
+function needsAthleteLicenseApplication(data: Pick<ApplicationData, "requirementsNeeded">) {
+  const requirementsNeeded = data.requirementsNeeded || defaultApplicationData.requirementsNeeded;
+  return requirementsNeeded.includes("athleteLicenseApplication");
 }
 
 function scrollFocusedFieldIntoView(event: React.FocusEvent<HTMLFormElement>) {

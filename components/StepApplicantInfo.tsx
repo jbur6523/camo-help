@@ -4,15 +4,20 @@ import type { UseFormReturn } from "react-hook-form";
 import { Field, SelectField } from "@/components/FormBits";
 import { calculateAge, formatBirthDateInput, type ApplicationData } from "@/lib/types";
 
-export function StepApplicantInfo({ form, short = false }: { form: UseFormReturn<ApplicationData>; short?: boolean }) {
+type ApplicantInfoMode = "full" | "documentsOnly" | "nationalIdOnly";
+
+export function StepApplicantInfo({ form, mode = "full" }: { form: UseFormReturn<ApplicationData>; mode?: ApplicantInfoMode }) {
   const { register, formState, setValue } = form;
+  const showFullApplicationFields = mode === "full";
+  const showMiddleName = mode !== "documentsOnly";
+
   return (
     <>
       <h2 className="step-title">Applicant Info</h2>
       <p className="step-help">Enter your legal information exactly as you want it to appear on the forms.</p>
       <div className="field-grid">
         <Field label="First name" name="firstName" register={register} errors={formState.errors} required />
-        {short ? null : <Field label="Middle name" name="middleName" register={register} errors={formState.errors} />}
+        {showMiddleName ? <Field label="Middle name" name="middleName" register={register} errors={formState.errors} /> : null}
         <Field label="Last name" name="lastName" register={register} errors={formState.errors} required />
         <Field
           label="Birth date"
@@ -32,7 +37,7 @@ export function StepApplicantInfo({ form, short = false }: { form: UseFormReturn
             }
           }}
         />
-        {short ? null : (
+        {showFullApplicationFields ? (
           <div className="field-grid two-col">
             <Field label="Age" name="age" register={register} errors={formState.errors} required inputMode="numeric" />
             <SelectField label="Sex" name="sex" register={register} errors={formState.errors} required>
@@ -41,10 +46,10 @@ export function StepApplicantInfo({ form, short = false }: { form: UseFormReturn
               <option value="Female">Female</option>
             </SelectField>
           </div>
-        )}
+        ) : null}
         <Field label="Phone number" name="phone" register={register} errors={formState.errors} required inputMode="tel" />
         <Field label="Email address" name="email" register={register} errors={formState.errors} required type="email" />
-        {short ? null : (
+        {showFullApplicationFields ? (
           <>
             <Field
               label="Street address"
@@ -92,7 +97,7 @@ export function StepApplicantInfo({ form, short = false }: { form: UseFormReturn
             </div>
             <Field label="Weight in pounds" name="weight" register={register} errors={formState.errors} required inputMode="numeric" />
           </>
-        )}
+        ) : null}
       </div>
     </>
   );

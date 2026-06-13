@@ -17,38 +17,42 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
       <h2 className="step-title">Application Type</h2>
       <p className="step-help">Choose the Athlete License and National MMA ID card type you need.</p>
       <div className="field-grid">
-        <div className="field">
-          <span className="field-label">Athlete License type</span>
-          <div className="choice-row">
-            {(["Original", "Renewal"] as const).map((type) => (
-              <button
-                aria-pressed={athleteLicenseType === type}
-                className="choice-button"
-                key={type}
-                type="button"
-                onClick={() => setValue("athleteLicenseType", type, { shouldDirty: true, shouldValidate: true })}
-              >
-                {type}
-              </button>
-            ))}
+        {needsAthleteLicense ? (
+          <div className="field">
+            <span className="field-label">Athlete License type</span>
+            <div className="choice-row">
+              {(["Original", "Renewal"] as const).map((type) => (
+                <button
+                  aria-pressed={athleteLicenseType === type}
+                  className="choice-button"
+                  key={type}
+                  type="button"
+                  onClick={() => setValue("athleteLicenseType", type, { shouldDirty: true, shouldValidate: true })}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="field">
-          <span className="field-label">National MMA ID type</span>
-          <div className="choice-row three">
-            {(["Original", "Renewal", "Replacement"] as const).map((type) => (
-              <button
-                aria-pressed={nationalIdType === type}
-                className="choice-button"
-                key={type}
-                type="button"
-                onClick={() => setValue("nationalIdType", type, { shouldDirty: true, shouldValidate: true })}
-              >
-                {type}
-              </button>
-            ))}
+        ) : null}
+        {needsNationalId ? (
+          <div className="field">
+            <span className="field-label">National MMA ID type</span>
+            <div className="choice-row three">
+              {(["Original", "Renewal", "Replacement"] as const).map((type) => (
+                <button
+                  aria-pressed={nationalIdType === type}
+                  className="choice-button"
+                  key={type}
+                  type="button"
+                  onClick={() => setValue("nationalIdType", type, { shouldDirty: true, shouldValidate: true })}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
         <div className="fee-box">
           {needsAthleteLicense ? (
             <div className="fee-line">
@@ -71,7 +75,9 @@ export function StepApplicationType({ form }: { form: UseFormReturn<ApplicationD
           <strong>Payment is separate.</strong> This app prepares and sends documents. Complete payment through CAMO after submission.
         </div>
         <p className="fine-print">
-          Selected: Athlete License {athleteLicenseType || "not selected"}, National MMA ID {nationalIdType || "not selected"}.
+          Selected: {needsAthleteLicense ? `Athlete License ${athleteLicenseType || "not selected"}` : ""}
+          {needsAthleteLicense && needsNationalId ? ", " : ""}
+          {needsNationalId ? `National MMA ID ${nationalIdType || "not selected"}` : ""}.
         </p>
       </div>
     </>

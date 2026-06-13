@@ -19,11 +19,13 @@ export function StepReview({
   form,
   uploadFiles,
   documentsOnly,
+  needsAthleteLicense,
   onEdit
 }: {
   form: UseFormReturn<ApplicationData>;
   uploadFiles: UploadedFiles;
   documentsOnly: boolean;
+  needsAthleteLicense: boolean;
   onEdit: (step: "requirements" | "applicantInfo" | "applicationType" | "fighterHistory" | "commissionHistory" | "legal" | "uploads") => void;
 }) {
   const { register, watch, formState, setValue, getValues } = form;
@@ -35,6 +37,8 @@ export function StepReview({
   const submittingNow = requirementOptions.filter((key) => requirementsNeeded.includes(key));
   const alreadyCompleted = requirementOptions.filter((key) => !requirementsNeeded.includes(key));
   const needsAthleteLicenseWaiver = requirementsNeeded.includes("athleteLicenseApplication");
+  const needsNationalId = requirementsNeeded.includes("nationalMmaIdApplication");
+  const needsApplicationForm = needsAthleteLicense || needsNationalId;
   const needsBloodworkAcknowledgement = requirementsNeeded.includes("bloodwork");
   const needsPhysicalAcknowledgement = requirementsNeeded.includes("physical");
   const selectedPromoterId = data.selectedPromoterId || independentPromoterId;
@@ -83,20 +87,20 @@ export function StepReview({
 
         <ReviewBlock title="Applicant info" onEdit={() => onEdit("applicantInfo")}>
           <ReviewLine label="Name" value={fullName(data)} />
-          <ReviewLine label="Birth date" value={`${data.birthDate} (${data.age || "age unknown"})`} />
+          <ReviewLine label="Birth date" value={needsAthleteLicense ? `${data.birthDate} (${data.age || "age unknown"})` : data.birthDate} />
           <ReviewLine label="Contact" value={`${data.email} / ${data.phone}`} />
-          {documentsOnly ? null : <ReviewLine label="Address" value={`${data.street}, ${data.city}, ${data.state} ${data.zip}, ${data.country}`} />}
-          {documentsOnly ? null : <ReviewLine label="Height / weight" value={`${data.heightFeet}' ${data.heightInches}" / ${data.weight} lbs`} />}
+          {needsAthleteLicense ? <ReviewLine label="Address" value={`${data.street}, ${data.city}, ${data.state} ${data.zip}, ${data.country}`} /> : null}
+          {needsAthleteLicense ? <ReviewLine label="Height / weight" value={`${data.heightFeet}' ${data.heightInches}" / ${data.weight} lbs`} /> : null}
         </ReviewBlock>
 
-        {documentsOnly ? null : (
+        {needsApplicationForm ? (
           <ReviewBlock title="Application types" onEdit={() => onEdit("applicationType")}>
-            <ReviewLine label="Athlete License" value={data.athleteLicenseType} />
-            <ReviewLine label="National MMA ID" value={data.nationalIdType} />
+            {needsAthleteLicense ? <ReviewLine label="Athlete License" value={data.athleteLicenseType} /> : null}
+            {needsNationalId ? <ReviewLine label="National MMA ID" value={data.nationalIdType} /> : null}
           </ReviewBlock>
-        )}
+        ) : null}
 
-        {documentsOnly ? null : (
+        {needsAthleteLicense ? (
           <ReviewBlock title="History" onEdit={() => onEdit("fighterHistory")}>
             <ReviewLine label="Other names" value={data.otherNames === "yes" ? data.otherNamesList : "No"} />
             <ReviewLine label="Disqualified" value={data.disqualified === "yes" ? data.disqualifiedExplanation : "No"} />
@@ -107,9 +111,9 @@ export function StepReview({
             />
             <ReviewLine label="Listed fights" value={String(data.fights.length)} />
           </ReviewBlock>
-        )}
+        ) : null}
 
-        {documentsOnly ? null : (
+        {needsAthleteLicense ? (
           <ReviewBlock title="Commission history" onEdit={() => onEdit("commissionHistory")}>
             <ReviewLine label="Prior licenses" value={data.licensedBefore === "yes" ? String(data.priorLicenses.length) : "No"} />
             <ReviewLine label="Discipline" value={data.commissionDiscipline === "yes" ? String(data.commissionActions.length) : "No"} />
@@ -118,14 +122,14 @@ export function StepReview({
               value={data.pendingCommissionCharges === "yes" ? String(data.commissionCharges.length) : "No"}
             />
           </ReviewBlock>
-        )}
+        ) : null}
 
-        {documentsOnly ? null : (
+        {needsAthleteLicense ? (
           <ReviewBlock title="Criminal / legal" onEdit={() => onEdit("legal")}>
             <ReviewLine label="Convictions" value={data.convictedCrime === "yes" ? String(data.convictions.length) : "No"} />
             <ReviewLine label="Pending charges" value={data.pendingLawCharges === "yes" ? String(data.pendingLawChargesList.length) : "No"} />
           </ReviewBlock>
-        )}
+        ) : null}
 
         <ReviewBlock title="Uploaded files" onEdit={() => onEdit("uploads")}>
           {(Object.keys(uploadLabels) as Array<keyof typeof uploadLabels>).map((key) => (
@@ -254,11 +258,11 @@ export function StepReview({
           ) : null}
         </div>
 
-        {documentsOnly ? null : (
+        {needsApplicationForm ? (
           <>
             <Field label="Typed legal name" name="signatureName" register={register} errors={formState.errors} required />
           </>
-        )}
+        ) : null}
 
         <section className="review-block">
           <div className="review-header">
