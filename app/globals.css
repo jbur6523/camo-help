@@ -719,6 +719,10 @@ textarea {
   margin-top: 12px;
 }
 
+.remembered-requirements-note {
+  margin-bottom: 14px;
+}
+
 .notice p {
   margin: 0 0 10px;
 }

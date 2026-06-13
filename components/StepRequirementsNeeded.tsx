@@ -8,18 +8,39 @@ import {
   physicalMdDoAcknowledgement
 } from "@/lib/medicalRequirements";
 import type { ApplicationData } from "@/lib/types";
-import { requirementLabels, requirementOptions } from "@/lib/types";
+import { requirementLabels, requirementOptions, type RequirementKey } from "@/lib/types";
 
-export function StepRequirementsNeeded({ form }: { form: UseFormReturn<ApplicationData> }) {
+export function StepRequirementsNeeded({
+  form,
+  rememberedSubmittedRequirements = []
+}: {
+  form: UseFormReturn<ApplicationData>;
+  rememberedSubmittedRequirements?: RequirementKey[];
+}) {
   const { register, watch, formState } = form;
   const selected = watch("requirementsNeeded") || [];
   const showPhysicalRequirement = selected.includes("physical");
   const showBloodworkRequirement = selected.includes("bloodwork");
+  const rememberedSubmittedLabels = requirementOptions
+    .filter((key) => rememberedSubmittedRequirements.includes(key))
+    .map((key) => requirementLabel(key));
 
   return (
     <>
       <h2 className="step-title centered-step-title">What do you need help submitting?</h2>
-      <p className="step-help">Everything is selected by default. Uncheck anything you have already submitted to CAMO.</p>
+      <p className="step-help">
+        {rememberedSubmittedLabels.length
+          ? "Items remembered as already submitted on this device are unchecked by default."
+          : "Everything is selected by default. Uncheck anything you have already submitted to CAMO."}
+      </p>
+      {rememberedSubmittedLabels.length ? (
+        <div className="notice remembered-requirements-note">
+          <p>
+            <strong>Remembered on this device:</strong> You previously submitted {formatRememberedRequirements(rememberedSubmittedLabels)}.
+          </p>
+          <p>You can re-check anything you still need to submit again.</p>
+        </div>
+      ) : null}
       <div className="review-block">
         {requirementOptions.map((key) => (
           <label className="checkbox-line" key={key}>
@@ -68,4 +89,10 @@ function requirementLabel(key: (typeof requirementOptions)[number]) {
   if (key === "bloodwork") return "Blood Work (HIV 4th Gen, Hep C Antibody, Hep B SURFACE ANTIGEN)";
   if (key === "physical") return "Physical (MUST BE DONE BY MD/DO)";
   return requirementLabels[key];
+}
+
+function formatRememberedRequirements(labels: string[]) {
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
 }

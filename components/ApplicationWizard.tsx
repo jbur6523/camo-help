@@ -26,12 +26,14 @@ import {
   paymentTotal,
   uploadLabels,
   type ApplicationData,
+  type RequirementKey,
   type UploadKey,
   type UploadedFiles
 } from "@/lib/types";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 
 const storageKey = "camo-help-application-v1";
+const submittedRequirementsStorageKey = "camo-help-submitted-requirements-v1";
 
 type StepId =
   | "requirements"
@@ -138,6 +140,7 @@ export function ApplicationWizard() {
   const [fighterConfirmationEmailSent, setFighterConfirmationEmailSent] = useState(false);
   const [pendingSubmissionId, setPendingSubmissionId] = useState("");
   const [submissionFailure, setSubmissionFailure] = useState<SubmissionFailure | null>(null);
+  const [rememberedSubmittedRequirements, setRememberedSubmittedRequirements] = useState<RequirementKey[]>([]);
   const submissionInFlightRef = useRef(false);
 
   const form = useForm<ApplicationData>({
@@ -152,9 +155,18 @@ export function ApplicationWizard() {
   const activeStepIndex = Math.max(activeSteps.indexOf(step), 0);
 
   useEffect(() => {
+    const rememberedRequirements = readRememberedSubmittedRequirements();
+    setRememberedSubmittedRequirements(rememberedRequirements);
     const saved = window.localStorage.getItem(storageKey);
     if (saved) {
       reset({ ...defaultApplicationData, ...JSON.parse(saved) });
+      return;
+    }
+    if (rememberedRequirements.length) {
+      reset({
+        ...defaultApplicationData,
+        requirementsNeeded: defaultApplicationData.requirementsNeeded.filter((key) => !rememberedRequirements.includes(key))
+      });
     }
   }, [reset]);
 
@@ -264,7 +276,9 @@ export function ApplicationWizard() {
 
       <form className="wizard-body" onFocusCapture={scrollFocusedFieldIntoView} onSubmit={(event) => event.preventDefault()}>
         {globalError ? <div className="notice" style={{ marginBottom: 16 }}><strong>Check this:</strong> {globalError}</div> : null}
-        {step === "requirements" ? <StepRequirementsNeeded form={form} /> : null}
+        {step === "requirements" ? (
+          <StepRequirementsNeeded form={form} rememberedSubmittedRequirements={rememberedSubmittedRequirements} />
+        ) : null}
         {step === "applicantInfo" ? <StepApplicantInfo form={form} short={documentsOnly} /> : null}
         {step === "applicationType" ? <StepApplicationType form={form} /> : null}
         {step === "fighterHistory" ? <StepFighterHistory form={form} /> : null}
@@ -663,6 +677,8 @@ export function ApplicationWizard() {
         setSubmissionFailure({ kind: "failed", submissionId, reason: "unexpected-response" });
         return;
       }
+      const nextRememberedSubmittedRequirements = rememberSubmittedRequirements(values.requirementsNeeded || []);
+      setRememberedSubmittedRequirements(nextRememberedSubmittedRequirements);
       window.localStorage.removeItem(storageKey);
       setSubmittedEmail(values.email);
       setSubmittedSubmissionId(result.submissionId || submissionId);
@@ -988,6 +1004,29 @@ function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: U
 
 function totalFileBytes(files: SubmissionFileSummary[]) {
   return files.reduce((total, file) => total + file.size, 0);
+}
+
+function readRememberedSubmittedRequirements(): RequirementKey[] {
+  try {
+    const raw = window.localStorage.getItem(submittedRequirementsStorageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isRequirementKey);
+  } catch {
+    return [];
+  }
+}
+
+function rememberSubmittedRequirements(requirementsNeeded: RequirementKey[]) {
+  const remembered = readRememberedSubmittedRequirements();
+  const next = defaultApplicationData.requirementsNeeded.filter((key) => remembered.includes(key) || requirementsNeeded.includes(key));
+  window.localStorage.setItem(submittedRequirementsStorageKey, JSON.stringify(next));
+  return next;
+}
+
+function isRequirementKey(value: unknown): value is RequirementKey {
+  return typeof value === "string" && defaultApplicationData.requirementsNeeded.includes(value as RequirementKey);
 }
 
 function submissionSizeProblem(files: SubmissionFileSummary[]) {
