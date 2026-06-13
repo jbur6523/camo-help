@@ -285,7 +285,7 @@ export async function sendPromoterNotificationEmail(application: ApplicationData
       from,
       to: promoter.email,
       subject: `New Fighter Submission - ${fullName(application)}`,
-      text: buildPromoterNotificationBody(application, new Date())
+      text: buildPromoterNotificationBody(application, new Date(), submissionId)
     });
 
     if (emailError) {
@@ -422,21 +422,33 @@ function buildMedicalEmailBody(application: ApplicationData, uploads: Partial<Re
   ].join("\n");
 }
 
-export function buildPromoterNotificationBody(application: ApplicationData, submittedAt: Date) {
+export function buildPromoterNotificationBody(application: ApplicationData, submittedAt: Date, submissionId?: string) {
   return [
-    `Fighter name: ${fullName(application)}`,
-    `Fighter email: ${application.email}`,
-    `Fighter phone: ${application.phone}`,
-    `Date of birth: ${application.birthDate}`,
-    `Requirements submitted: ${selectedRequirementLabels(application)}`,
-    `Submission date/time: ${formatPacificDateTime(submittedAt)}`,
+    "New Fighter Submission",
     "",
-    "No medical documents, IDs, headshots, or PDFs are included in this promoter notification."
+    "A fighter selected your promotion during their CAMO Help submission.",
+    "",
+    "Fighter Contact",
+    "",
+    `Fighter name: ${fullName(application)}`,
+    `Fighter email: ${application.email || "Not provided"}`,
+    `Fighter phone: ${application.phone || "Not provided"}`,
+    "",
+    "Submission Details",
+    "",
+    `Date of birth: ${application.birthDate || "Not provided"}`,
+    `Submission date/time: ${formatPacificDateTime(submittedAt)}`,
+    `Reference ID: ${submissionId || "Not assigned"}`,
+    "",
+    "Requirements Submitted:",
+    "",
+    ...selectedRequirementLines(application)
   ].join("\n");
 }
 
-function selectedRequirementLabels(application: ApplicationData) {
-  return (application.requirementsNeeded || []).map((key) => requirementLabels[key]).join(", ") || "None";
+function selectedRequirementLines(application: ApplicationData) {
+  const lines = (application.requirementsNeeded || []).map((key) => `- ${requirementLabels[key]}`);
+  return lines.length ? lines : ["- None selected"];
 }
 
 function complianceContactLine(fighterEmail: string) {
