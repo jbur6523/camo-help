@@ -114,9 +114,13 @@ type SubmissionDeliveryState = {
 
 const safeResponsePreviewLength = 180;
 const maxSingleOutgoingFileBytes = 4 * 1024 * 1024;
-const identityImageCompression: Record<Extract<UploadKey, "headshot" | "photoId">, { maxDimension: number; quality: number; filenamePrefix: string }> = {
-  headshot: { maxDimension: 1200, quality: 0.82, filenamePrefix: "headshot-selfie" },
-  photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id" }
+const imageUploadCompression: Record<UploadKey, { maxDimension: number; quality: number; filenamePrefix: string; imageRequired?: boolean }> = {
+  bloodwork: { maxDimension: 1600, quality: 0.82, filenamePrefix: "blood-work" },
+  physical: { maxDimension: 1600, quality: 0.82, filenamePrefix: "physical-exam" },
+  headshot: { maxDimension: 1200, quality: 0.82, filenamePrefix: "headshot-selfie", imageRequired: true },
+  photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id", imageRequired: true },
+  cardio: { maxDimension: 1600, quality: 0.82, filenamePrefix: "cardio-ekg" },
+  additional: { maxDimension: 1600, quality: 0.82, filenamePrefix: "additional-document" }
 };
 
 export function ApplicationWizard() {
@@ -870,16 +874,17 @@ function isValidEmail(email: string) {
 }
 
 async function prepareUploadFiles(key: UploadKey, files: File[]) {
-  if (key !== "headshot" && key !== "photoId") return files;
-
-  const config = identityImageCompression[key];
+  const config = imageUploadCompression[key];
   return Promise.all(
     files.map(async (file) => {
       if (!file.type.startsWith("image/")) {
-        throw new Error("Identity uploads must be image files.");
+        if (config.imageRequired) {
+          throw new Error("Identity uploads must be image files.");
+        }
+        return file;
       }
       try {
-        return await compressIdentityImage(file, config);
+        return await compressImageUpload(file, config);
       } catch {
         return file;
       }
@@ -887,7 +892,7 @@ async function prepareUploadFiles(key: UploadKey, files: File[]) {
   );
 }
 
-async function compressIdentityImage(
+async function compressImageUpload(
   file: File,
   {
     maxDimension,
@@ -909,7 +914,7 @@ async function compressIdentityImage(
   context.drawImage(image, 0, 0, width, height);
   const blob = await canvasToJpegBlob(canvas, quality);
   URL.revokeObjectURL(image.src);
-  return new File([blob], compressedIdentityFilename(file.name, filenamePrefix), {
+  return new File([blob], compressedUploadFilename(file.name, filenamePrefix), {
     type: "image/jpeg",
     lastModified: Date.now()
   });
@@ -950,7 +955,7 @@ function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number) {
   });
 }
 
-function compressedIdentityFilename(originalName: string, prefix: string) {
+function compressedUploadFilename(originalName: string, prefix: string) {
   const baseName = originalName.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
   return `${prefix}${baseName ? `-${baseName}` : ""}.jpg`;
 }
