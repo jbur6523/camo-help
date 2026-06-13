@@ -385,6 +385,9 @@ export function ApplicationWizard() {
     if (currentStep === "review" && (values.requirementsNeeded || []).includes("physical")) {
       requireFields.push("certifyPhysicalRequirements");
     }
+    if (currentStep === "review" && (values.requirementsNeeded || []).includes("athleteLicenseApplication")) {
+      requireFields.push("certifyAthleteLicenseWaiver");
+    }
 
     if (requireFields.length && !(await form.trigger(requireFields))) {
       setGlobalError("Please complete the required fields before continuing.");

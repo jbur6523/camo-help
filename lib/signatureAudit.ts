@@ -12,5 +12,15 @@ export const signatureConfirmationCheckboxLanguage = [
   "I understand payment must be completed separately through CAMO."
 ];
 
+export const athleteLicenseWaiverAcknowledgementLanguage =
+  "I certify that I have reviewed the CAMO Athlete License Application, Agreement and Waiver, understand its terms, and agree to be bound by them.";
+
+export function signatureConfirmationCheckboxLanguageFor(requirementsNeeded: string[] = []) {
+  return [
+    ...signatureConfirmationCheckboxLanguage,
+    ...(requirementsNeeded.includes("athleteLicenseApplication") ? [athleteLicenseWaiverAcknowledgementLanguage] : [])
+  ];
+}
+
 export const signatureCertificationStatement =
   "The signer confirmed that their typed legal name and submission confirmation were intended to serve as their electronic signature for the certified document(s) listed above. This certificate records the signature and submission information collected by CAMO Help. CAMO may require additional verification or official signing if needed.";

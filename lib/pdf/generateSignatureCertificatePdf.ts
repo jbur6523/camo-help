@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
 import {
   signatureCertificationStatement,
-  signatureConfirmationCheckboxLanguage,
+  signatureConfirmationCheckboxLanguageFor,
   type ApproximateIpLocation
 } from "@/lib/signatureAudit";
 import type { ApplicationData } from "@/lib/types";
@@ -132,7 +132,7 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
 
   drawSection("Confirmation Info");
   drawText("Confirmation checkbox language accepted during submission:", { font: boldFont });
-  signatureConfirmationCheckboxLanguage.forEach((line) => drawText(`- ${line}`));
+  signatureConfirmationCheckboxLanguageFor(input.application.requirementsNeeded).forEach((line) => drawText(`- ${line}`));
   y -= 2;
   drawText("Certification statement:", { font: boldFont });
   drawText(signatureCertificationStatement);

@@ -112,6 +112,7 @@ export type ApplicationData = {
   certifyConsequences: boolean;
   certifyHelperOnly: boolean;
   certifyPaymentSeparate: boolean;
+  certifyAthleteLicenseWaiver: boolean;
   certifyBloodworkRequirements: boolean;
   certifyPhysicalRequirements: boolean;
   signatureName: string;
@@ -210,6 +211,7 @@ export const defaultApplicationData: ApplicationData = {
   certifyConsequences: false,
   certifyHelperOnly: false,
   certifyPaymentSeparate: false,
+  certifyAthleteLicenseWaiver: false,
   certifyBloodworkRequirements: false,
   certifyPhysicalRequirements: false,
   signatureName: "",

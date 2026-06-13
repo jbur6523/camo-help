@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Field } from "@/components/FormBits";
 import { bloodTestRequirements, physicalMdDoAcknowledgement } from "@/lib/medicalRequirements";
+import { athleteLicenseTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
 import { independentPromoterId, independentPromotionName } from "@/lib/promoters/constants";
+import { athleteLicenseWaiverAcknowledgementLanguage } from "@/lib/signatureAudit";
 import type { ApplicationData, UploadedFiles } from "@/lib/types";
 import { fullName, paymentTotal, requirementLabels, requirementOptions, uploadLabels } from "@/lib/types";
 
@@ -32,6 +34,7 @@ export function StepReview({
   const requirementsNeeded = data.requirementsNeeded || [];
   const submittingNow = requirementOptions.filter((key) => requirementsNeeded.includes(key));
   const alreadyCompleted = requirementOptions.filter((key) => !requirementsNeeded.includes(key));
+  const needsAthleteLicenseWaiver = requirementsNeeded.includes("athleteLicenseApplication");
   const needsBloodworkAcknowledgement = requirementsNeeded.includes("bloodwork");
   const needsPhysicalAcknowledgement = requirementsNeeded.includes("physical");
   const selectedPromoterId = data.selectedPromoterId || independentPromoterId;
@@ -158,6 +161,33 @@ export function StepReview({
           unless you are ready to share documents for application processing. No record of documents or personal data is stored by
           camo-help.com.
         </div>
+
+        {needsAthleteLicenseWaiver ? (
+          <section className="review-block">
+            <div className="review-header">
+              <h3>Review Athlete License Agreement & Waiver</h3>
+            </div>
+            <p>
+              The CAMO Athlete License Application includes agreement, waiver, release, and certification language. Please review it
+              before submitting.
+            </p>
+            <p>
+              <a className="button secondary" href={athleteLicenseTemplatePath} target="_blank" rel="noreferrer">
+                View Athlete License Application & Waiver
+              </a>
+            </p>
+            <label className="checkbox-line">
+              <input
+                type="checkbox"
+                {...register("certifyAthleteLicenseWaiver", { required: "Athlete License waiver acknowledgement is required." })}
+              />
+              <span>{athleteLicenseWaiverAcknowledgementLanguage}</span>
+            </label>
+            {formState.errors.certifyAthleteLicenseWaiver ? (
+              <div className="error">Athlete License waiver acknowledgement is required.</div>
+            ) : null}
+          </section>
+        ) : null}
 
         <div className="review-block">
           {documentsOnly ? (
