@@ -9,6 +9,13 @@ type SupportNotification = {
   text: string;
   source: string;
   submissionId?: string;
+  attachments?: SupportEmailAttachment[];
+};
+
+type SupportEmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
 };
 
 type SupportErrorNotification = {
@@ -32,6 +39,7 @@ type PromoterRegistrationSupportPayload = {
   contactName: string;
   websiteUrl: string;
   submittedAt: Date;
+  governmentIdAttachment?: SupportEmailAttachment;
 };
 
 type PromoterStatusChangeSupportPayload = {
@@ -58,7 +66,7 @@ type FighterSubmissionSupportPayload = {
 
 const adminPromotersPath = "/admin/promoters";
 
-export async function sendSupportNotification({ subject, text, source, submissionId }: SupportNotification) {
+export async function sendSupportNotification({ subject, text, source, submissionId, attachments }: SupportNotification) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const to = process.env.SUPPORT_EMAIL_TO;
@@ -88,7 +96,16 @@ export async function sendSupportNotification({ subject, text, source, submissio
       from,
       to,
       subject,
-      text
+      text,
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType
+            }))
+          }
+        : {})
     });
 
     if (error) {
@@ -160,7 +177,8 @@ export async function sendSupportPromoterRegistrationNotification({
   promoterEmail,
   contactName,
   websiteUrl,
-  submittedAt
+  submittedAt,
+  governmentIdAttachment
 }: PromoterRegistrationSupportPayload) {
   return sendSupportNotification({
     source: "app/api/promoter-registration POST",
@@ -173,8 +191,10 @@ export async function sendSupportPromoterRegistrationNotification({
       `Website / Social Link: ${websiteUrl}`,
       `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
       "Status: pending",
+      `Government ID attachment: ${governmentIdAttachment ? governmentIdAttachment.filename : "Not attached"}`,
       `Admin review path: ${adminPromotersPath}`
-    ].join("\n")
+    ].join("\n"),
+    attachments: governmentIdAttachment ? [governmentIdAttachment] : undefined
   });
 }
 

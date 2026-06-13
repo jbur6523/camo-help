@@ -85,7 +85,8 @@ export async function POST(request: Request) {
 
     await sendSupportPromoterRegistrationNotification({
       ...registration,
-      submittedAt: new Date()
+      submittedAt: new Date(),
+      governmentIdAttachment: governmentId
     });
     await sendPromoterPendingVerificationEmail(registration);
 
