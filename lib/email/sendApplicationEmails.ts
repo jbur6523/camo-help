@@ -16,6 +16,7 @@ export type SubmissionEmailPayload = {
   application: ApplicationData;
   athletePdf?: EmailAttachment;
   nationalIdPdf?: EmailAttachment;
+  signatureCertificatePdf?: EmailAttachment;
   uploads: Partial<Record<UploadKey, EmailAttachment[]>>;
 };
 
@@ -148,6 +149,7 @@ export function buildSubmissionEmailMessages(
   const applicationAttachments = [
     ...(requirementsNeeded.includes("athleteLicenseApplication") && payload.athletePdf ? [payload.athletePdf] : []),
     ...(requirementsNeeded.includes("nationalMmaIdApplication") && payload.nationalIdPdf ? [payload.nationalIdPdf] : []),
+    ...(payload.signatureCertificatePdf ? [payload.signatureCertificatePdf] : []),
     ...(requirementsNeeded.includes("headshot") ? payload.uploads.headshot || [] : []),
     ...(requirementsNeeded.includes("photoId") ? payload.uploads.photoId || [] : [])
   ];
@@ -167,7 +169,7 @@ export function buildSubmissionEmailMessages(
       kind: "application",
       to: applicationRecipient,
       subject: `Submission: ${name} - ${formatEmailDate(new Date())}`,
-      text: buildApplicationEmailBody(payload.application, applicationAttachments),
+      text: buildApplicationEmailBody(payload.application, applicationAttachments, payload.submissionId),
       attachments: applicationAttachments
     });
   }
@@ -391,13 +393,14 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
   }
 }
 
-function buildApplicationEmailBody(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
+function buildApplicationEmailBody(application: ApplicationData, applicationAttachments: EmailAttachment[], submissionId?: string) {
   return [
     complianceContactLine(application.email),
     "",
     `Applicant: ${fullName(application)}`,
     `Email: ${application.email}`,
     `DOB: ${application.birthDate}`,
+    `Reference ID: ${submissionId || "Not assigned"}`,
     "",
     "Requirements Submitted:",
     "",

@@ -16,6 +16,7 @@ import { combatTrioPhoneDisplay, combatTrioPhoneHref } from "@/lib/medicalRequir
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
+import type { SignatureLocationAudit } from "@/lib/signatureAudit";
 import {
   calculateAge,
   defaultApplicationData,
@@ -133,6 +134,11 @@ export function ApplicationWizard() {
   const [fighterConfirmationEmailSent, setFighterConfirmationEmailSent] = useState(false);
   const [pendingSubmissionId, setPendingSubmissionId] = useState("");
   const [submissionFailure, setSubmissionFailure] = useState<SubmissionFailure | null>(null);
+  const [signatureLocation, setSignatureLocation] = useState<SignatureLocationAudit>({
+    status: "unavailable",
+    reason: "Not requested"
+  });
+  const [isRequestingSignatureLocation, setIsRequestingSignatureLocation] = useState(false);
   const submissionInFlightRef = useRef(false);
 
   const form = useForm<ApplicationData>({
@@ -280,6 +286,9 @@ export function ApplicationWizard() {
             onGenerate={confirmEmailAndGenerateForms}
             onSubmit={submitDocuments}
             documentsOnly={documentsOnly}
+            signatureLocation={signatureLocation}
+            isRequestingSignatureLocation={isRequestingSignatureLocation}
+            onRequestSignatureLocation={requestSignatureLocation}
           />
         ) : null}
       </form>
@@ -580,6 +589,7 @@ export function ApplicationWizard() {
       const formData = new FormData();
       formData.append("submissionId", submissionId);
       formData.append("application", JSON.stringify(values));
+      formData.append("signatureAudit", JSON.stringify({ location: locationForSubmit(signatureLocation) }));
       if (generated.athleteBlob) {
         formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
       }
@@ -711,6 +721,45 @@ export function ApplicationWizard() {
       setSubmissionFailure({ kind: "failed", submissionId });
     }
   }
+
+  function requestSignatureLocation() {
+    setGlobalError("");
+    if (!navigator.geolocation) {
+      setSignatureLocation({
+        status: "unavailable",
+        reason: "Geolocation is not available in this browser.",
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    setIsRequestingSignatureLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSignatureLocation({
+          status: "granted",
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date(position.timestamp).toISOString()
+        });
+        setIsRequestingSignatureLocation(false);
+      },
+      (error) => {
+        setSignatureLocation(
+          error.code === 1
+            ? { status: "denied", timestamp: new Date().toISOString() }
+            : {
+                status: "unavailable",
+                reason: error.message || "Location could not be collected.",
+                timestamp: new Date().toISOString()
+              }
+        );
+        setIsRequestingSignatureLocation(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    );
+  }
 }
 
 function SubmissionFailurePage({ failure }: { failure: SubmissionFailure }) {
@@ -763,7 +812,10 @@ function GenerateStep({
   onEmailChange,
   onGenerate,
   onSubmit,
-  documentsOnly
+  documentsOnly,
+  signatureLocation,
+  isRequestingSignatureLocation,
+  onRequestSignatureLocation
 }: {
   pdfs: GeneratedPdfs | null;
   isBusy: boolean;
@@ -773,6 +825,9 @@ function GenerateStep({
   onGenerate: () => Promise<void>;
   onSubmit: () => Promise<void>;
   documentsOnly: boolean;
+  signatureLocation: SignatureLocationAudit;
+  isRequestingSignatureLocation: boolean;
+  onRequestSignatureLocation: () => void;
 }) {
   const hasCurrentGeneratedForms = Boolean(pdfs && pdfs.email === email.trim());
 
@@ -806,6 +861,16 @@ function GenerateStep({
             {emailError ? <div className="error" id="final-email-error">{emailError}</div> : null}
           </div>
         </section>
+        {!documentsOnly ? (
+          <section className="final-email-confirmation" aria-labelledby="signature-location-heading">
+            <h3 id="signature-location-heading">Optional Location</h3>
+            <p>Location is optional and is used only to strengthen the signature audit record.</p>
+            <button className="button secondary" type="button" onClick={onRequestSignatureLocation} disabled={isBusy || isRequestingSignatureLocation}>
+              {isRequestingSignatureLocation ? "Checking Location..." : "Add Location to Signature Record"}
+            </button>
+            <p aria-live="polite">{signatureLocationStatusText(signatureLocation)}</p>
+          </section>
+        ) : null}
         {!hasCurrentGeneratedForms ? (
           <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
             {isBusy ? "Working..." : documentsOnly ? "Confirm Email & Submit Documents" : "Confirm Email & Generate Forms"}
@@ -1076,6 +1141,26 @@ function formatBytes(bytes: number) {
 
 function createSubmissionId() {
   return createSubmissionReferenceId();
+}
+
+function locationForSubmit(location: SignatureLocationAudit): SignatureLocationAudit {
+  if (location.status === "unavailable" && !location.timestamp) {
+    return { ...location, timestamp: new Date().toISOString() };
+  }
+  return location;
+}
+
+function signatureLocationStatusText(location: SignatureLocationAudit) {
+  if (location.status === "granted") {
+    return `Location granted with about ${Math.round(location.accuracy)} meters accuracy.`;
+  }
+  if (location.status === "denied") {
+    return "Location permission denied. You can still submit.";
+  }
+  if (location.reason === "Not requested") {
+    return "No location added yet. You can still submit without it.";
+  }
+  return "Location unavailable. You can still submit.";
 }
 
 function isDocumentsOnly(data: Pick<ApplicationData, "requirementsNeeded">) {

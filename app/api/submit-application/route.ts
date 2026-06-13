@@ -5,6 +5,7 @@ import {
   sendPromoterNotificationEmail,
   SubmissionEmailDeliveryError
 } from "@/lib/email/sendApplicationEmails";
+import { generateSignatureCertificatePdf } from "@/lib/pdf/generateSignatureCertificatePdf";
 import {
   safeErrorMessage,
   sendSupportErrorNotification,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/email/supportNotifications";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
+import type { SignatureAuditPayload, SignatureLocationAudit } from "@/lib/signatureAudit";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName } from "@/lib/types";
 import { independentPromoterId } from "@/lib/promoters/constants";
@@ -62,6 +64,9 @@ export async function POST(request: Request) {
     const application = JSON.parse(applicationJson) as ApplicationData;
     applicationForError = application;
     deliveryState.completedStep = "application_payload_parsed";
+    const signatureAudit = parseSignatureAudit(formData.get("signatureAudit"));
+    const ipAddress = clientIpFromHeaders(request.headers);
+    const userAgent = request.headers.get("user-agent") || "Unavailable";
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
@@ -84,11 +89,26 @@ export async function POST(request: Request) {
     deliveryState.completedStep = "required_uploads_validated";
 
     const submittedAt = new Date();
+    const certifiedDocuments = certifiedApplicationDocuments(application);
+    const signatureCertificatePdf = certifiedDocuments.length
+      ? await signatureCertificateAttachment({
+          submissionId,
+          submittedAt,
+          application,
+          certifiedDocuments,
+          ipAddress,
+          userAgent,
+          location: signatureAudit.location
+        })
+      : undefined;
+    deliveryState.completedStep = "signature_certificate_generated";
+
     const result = await sendApplicationEmails({
       submissionId,
       application,
       athletePdf,
       nationalIdPdf,
+      signatureCertificatePdf,
       uploads
     });
     deliveryState.applicationEmailSent = Boolean(result.applicationRecipient);
@@ -190,6 +210,7 @@ function classifySubmissionError(message: string, error: unknown) {
   }
   if (error instanceof MissingRequiredUploadsError) return "Upload Validation Failure";
   if (error instanceof NoSelectedEmailAttachmentsError) return "No Selected Email Attachments";
+  if (message.toLowerCase().includes("signature certification pdf")) return "PDF Generation Failure";
   if (message.startsWith("Missing required email environment variable")) return "Missing Required Environment Variable";
   if (message.startsWith("Resend email failed")) return "Email Sending Failure";
   if (message.toLowerCase().includes("formdata") || message.toLowerCase().includes("file")) return "Upload Parsing Failure";
@@ -209,4 +230,106 @@ function deliveryStateDetails(deliveryState: DeliveryState) {
     `Fighter confirmation email sent: ${deliveryState.fighterConfirmationEmailSent ? "yes" : "no"}`,
     `Support notification email attempted: ${deliveryState.supportNotificationAttempted ? "yes" : "no"}`
   ];
+}
+
+async function signatureCertificateAttachment({
+  submissionId,
+  submittedAt,
+  application,
+  certifiedDocuments,
+  ipAddress,
+  userAgent,
+  location
+}: {
+  submissionId: string;
+  submittedAt: Date;
+  application: ApplicationData;
+  certifiedDocuments: string[];
+  ipAddress: string;
+  userAgent: string;
+  location: SignatureLocationAudit;
+}) {
+  try {
+    const certificateBytes = await generateSignatureCertificatePdf({
+      submissionId,
+      submittedAt,
+      application,
+      certifiedDocuments,
+      ipAddress,
+      userAgent,
+      location
+    });
+    console.info("Signature certificate PDF generated.", {
+      submissionId,
+      certifiedDocumentCount: certifiedDocuments.length
+    });
+    return {
+      filename: `signature-certificate-${submissionId}.pdf`,
+      content: Buffer.from(certificateBytes),
+      contentType: "application/pdf"
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown PDF generation error.";
+    throw new Error(`Signature Certification PDF generation failed: ${message}`);
+  }
+}
+
+function certifiedApplicationDocuments(application: ApplicationData) {
+  const requirementsNeeded = application.requirementsNeeded || [];
+  return [
+    ...(requirementsNeeded.includes("athleteLicenseApplication") ? ["CAMO Athlete License Application"] : []),
+    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["National MMA ID Application"] : [])
+  ];
+}
+
+function parseSignatureAudit(value: FormDataEntryValue | null): { location: SignatureLocationAudit } {
+  if (typeof value !== "string" || !value.trim()) {
+    return { location: unavailableLocation("Not collected") };
+  }
+
+  try {
+    const parsed = JSON.parse(value) as SignatureAuditPayload;
+    return { location: normalizeLocation(parsed.location) };
+  } catch {
+    return { location: unavailableLocation("Invalid location audit payload") };
+  }
+}
+
+function normalizeLocation(location: SignatureAuditPayload["location"]): SignatureLocationAudit {
+  if (!location) return unavailableLocation("Not collected");
+  if (location.status === "denied") {
+    return { status: "denied", timestamp: stringOrUndefined(location.timestamp) };
+  }
+  if (location.status === "granted") {
+    return {
+      status: "granted",
+      latitude: finiteNumber(location.latitude),
+      longitude: finiteNumber(location.longitude),
+      accuracy: finiteNumber(location.accuracy),
+      timestamp: stringOrUndefined(location.timestamp) || new Date().toISOString()
+    };
+  }
+  return {
+    status: "unavailable",
+    reason: stringOrUndefined(location.reason) || "Not collected",
+    timestamp: stringOrUndefined(location.timestamp)
+  };
+}
+
+function unavailableLocation(reason: string): SignatureLocationAudit {
+  return { status: "unavailable", reason, timestamp: new Date().toISOString() };
+}
+
+function finiteNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function stringOrUndefined(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function clientIpFromHeaders(headers: Headers) {
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0]?.trim() || "Unavailable";
+  return headers.get("x-real-ip") || "Unavailable";
 }
