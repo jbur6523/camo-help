@@ -556,6 +556,32 @@ textarea {
   height: 20px;
 }
 
+.requirement-checklist-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0ee;
+}
+
+.requirement-checklist-item .checkbox-line {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.requirement-download-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  margin: 8px 0 0 34px;
+  padding: 8px 10px;
+  border: 1px solid #b8d5ca;
+  border-radius: 8px;
+  background: #eef8f3;
+  color: var(--brand-dark);
+  font-weight: 900;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .wizard-bottom-nav {
   position: fixed;
   left: 0;

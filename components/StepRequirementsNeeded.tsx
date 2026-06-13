@@ -42,12 +42,28 @@ export function StepRequirementsNeeded({
         </div>
       ) : null}
       <div className="review-block">
-        {requirementOptions.map((key) => (
-          <label className="checkbox-line" key={key}>
-            <input type="checkbox" value={key} {...register("requirementsNeeded")} />
-            {requirementLabel(key)}
-          </label>
-        ))}
+        {requirementOptions.map((key) => {
+          const downloadLink = requirementDownloadLink(key);
+          return (
+            <div className="requirement-checklist-item" key={key}>
+              <label className="checkbox-line">
+                <input type="checkbox" value={key} {...register("requirementsNeeded")} />
+                {requirementLabel(key)}
+              </label>
+              {downloadLink ? (
+                <a
+                  className="requirement-download-link"
+                  href={downloadLink.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...(downloadLink.download ? { download: true } : {})}
+                >
+                  {downloadLink.label}
+                </a>
+              ) : null}
+            </div>
+          );
+        })}
         {!selected.length || formState.errors.requirementsNeeded ? (
           <div className="error">Select at least one item to submit now.</div>
         ) : null}
@@ -89,6 +105,24 @@ function requirementLabel(key: (typeof requirementOptions)[number]) {
   if (key === "bloodwork") return "Blood Work (HIV 4th Gen, Hep C Antibody, Hep B SURFACE ANTIGEN)";
   if (key === "physical") return "Physical (MUST BE DONE BY MD/DO)";
   return requirementLabels[key];
+}
+
+function requirementDownloadLink(key: (typeof requirementOptions)[number]) {
+  if (key === "physical") {
+    return {
+      href: "/templates/Athlete Physical Form.pdf",
+      label: "Download & Print Physical Form",
+      download: true
+    };
+  }
+  if (key === "bloodwork") {
+    return {
+      href: "/templates/CAMO Blood Test Instructions.pdf",
+      label: "Download Blood Test Instructions",
+      download: false
+    };
+  }
+  return null;
 }
 
 function formatRememberedRequirements(labels: string[]) {
