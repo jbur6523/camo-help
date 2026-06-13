@@ -171,8 +171,8 @@ export function StepReview({
               The CAMO Athlete License Application includes agreement, waiver, release, and certification language. Please review it
               before submitting.
             </p>
-            <p>
-              <a className="button secondary" href={athleteLicenseTemplatePath} target="_blank" rel="noreferrer">
+            <p className="waiver-review-link-wrap">
+              <a className="waiver-review-link" href={athleteLicenseTemplatePath} target="_blank" rel="noreferrer">
                 View Athlete License Application & Waiver
               </a>
             </p>

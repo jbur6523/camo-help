@@ -774,6 +774,24 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.waiver-review-link-wrap {
+  margin: 8px 0 2px;
+  text-align: center;
+}
+
+.waiver-review-link {
+  display: inline-block;
+  min-height: 44px;
+  padding: 8px 4px;
+  color: var(--brand-dark);
+  background: transparent;
+  border: 0;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
 .review-header {
   display: flex;
   align-items: center;
