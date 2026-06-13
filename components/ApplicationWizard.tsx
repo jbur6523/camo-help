@@ -13,6 +13,7 @@ import { StepReview } from "@/components/StepReview";
 import { SuccessPage } from "@/components/SuccessPage";
 import { WizardBottomNav } from "@/components/WizardBottomNav";
 import { combatTrioPhoneDisplay, combatTrioPhoneHref } from "@/lib/medicalRequirements";
+import { formatPacificDate } from "@/lib/dates";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
@@ -375,8 +376,7 @@ export function ApplicationWizard() {
                 "certifyConsequences",
                 "certifyHelperOnly",
                 "certifyPaymentSeparate",
-                "signatureName",
-                "signatureDate"
+                "signatureName"
               ]
           : [];
     if (currentStep === "review" && (values.requirementsNeeded || []).includes("bloodwork")) {
@@ -476,7 +476,7 @@ export function ApplicationWizard() {
     if (manageBusy) setIsBusy(true);
     setGlobalError("");
     try {
-      const values = form.getValues();
+      const values = formValuesWithAutomaticSignatureDate(new Date());
       const requirementsNeeded = values.requirementsNeeded || defaultApplicationData.requirementsNeeded;
       const needsAthleteLicense = requirementsNeeded.includes("athleteLicenseApplication");
       const needsNationalId = requirementsNeeded.includes("nationalMmaIdApplication");
@@ -710,6 +710,13 @@ export function ApplicationWizard() {
     if (!generated) {
       setSubmissionFailure({ kind: "failed", submissionId });
     }
+  }
+
+  function formValuesWithAutomaticSignatureDate(date: Date) {
+    const values = form.getValues();
+    const signatureDate = formatPacificDate(date);
+    setValue("signatureDate", signatureDate, { shouldDirty: true });
+    return { ...values, signatureDate };
   }
 }
 

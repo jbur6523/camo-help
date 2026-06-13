@@ -29,6 +29,15 @@ export function formatPacificLongDate(date: Date) {
   }).format(date);
 }
 
+export function formatPacificDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    timeZone: pacificTimeZone
+  }).format(date);
+}
+
 export function formatPacificDateTime(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "2-digit",

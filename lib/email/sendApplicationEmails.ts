@@ -220,7 +220,7 @@ function delay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-export async function sendPromoterNotificationEmail(application: ApplicationData, submissionId: string) {
+export async function sendPromoterNotificationEmail(application: ApplicationData, submissionId: string, submittedAt = new Date()) {
   const selectedPromoterId = application.selectedPromoterId;
   if (!selectedPromoterId || selectedPromoterId === independentPromoterId) return null;
 
@@ -285,7 +285,7 @@ export async function sendPromoterNotificationEmail(application: ApplicationData
       from,
       to: promoter.email,
       subject: `New Fighter Submission - ${fullName(application)}`,
-      text: buildPromoterNotificationBody(application, new Date(), submissionId)
+      text: buildPromoterNotificationBody(application, submittedAt, submissionId)
     });
 
     if (emailError) {

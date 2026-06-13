@@ -227,7 +227,6 @@ export function StepReview({
         {documentsOnly ? null : (
           <>
             <Field label="Typed legal name" name="signatureName" register={register} errors={formState.errors} required />
-            <Field label="Signature date" name="signatureDate" register={register} errors={formState.errors} required type="date" />
           </>
         )}
 

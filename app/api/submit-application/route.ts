@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   NoSelectedEmailAttachmentsError,
@@ -11,6 +13,10 @@ import {
   sendSupportErrorNotification,
   sendSupportFighterSubmissionNotification
 } from "@/lib/email/supportNotifications";
+import { formatPacificDate } from "@/lib/dates";
+import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
+import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
+import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApproximateIpLocation } from "@/lib/signatureAudit";
@@ -66,15 +72,15 @@ export async function POST(request: Request) {
     deliveryState.completedStep = "application_payload_parsed";
     const ipAddress = clientIpFromHeaders(request.headers);
     const approximateIpLocation = approximateIpLocationFromHeaders(request.headers);
-    const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
-    const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
+    const submittedAthletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
+    const submittedNationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
 
-    if (requirementsNeeded.includes("athleteLicenseApplication") && !athletePdf) {
+    if (requirementsNeeded.includes("athleteLicenseApplication") && !submittedAthletePdf) {
       return NextResponse.json({ error: "Completed Athlete License PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
-    if (requirementsNeeded.includes("nationalMmaIdApplication") && !nationalIdPdf) {
+    if (requirementsNeeded.includes("nationalMmaIdApplication") && !submittedNationalIdPdf) {
       return NextResponse.json({ error: "Completed National MMA ID PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
@@ -88,12 +94,25 @@ export async function POST(request: Request) {
     deliveryState.completedStep = "required_uploads_validated";
 
     const submittedAt = new Date();
-    const certifiedDocuments = certifiedApplicationDocuments(application);
+    const applicationWithSubmissionDate = {
+      ...application,
+      signatureDate: formatPacificDate(submittedAt)
+    };
+    applicationForError = applicationWithSubmissionDate;
+    const athletePdf = requirementsNeeded.includes("athleteLicenseApplication")
+      ? await serverGeneratedOfficialPdf("athlete", applicationWithSubmissionDate)
+      : undefined;
+    const nationalIdPdf = requirementsNeeded.includes("nationalMmaIdApplication")
+      ? await serverGeneratedOfficialPdf("nationalId", applicationWithSubmissionDate)
+      : undefined;
+    deliveryState.completedStep = "official_pdfs_generated";
+
+    const certifiedDocuments = certifiedApplicationDocuments(applicationWithSubmissionDate);
     const signatureCertificatePdf = certifiedDocuments.length
       ? await signatureCertificateAttachment({
           submissionId,
           submittedAt,
-          application,
+          application: applicationWithSubmissionDate,
           certifiedDocuments,
           ipAddress,
           approximateIpLocation
@@ -103,7 +122,7 @@ export async function POST(request: Request) {
 
     const result = await sendApplicationEmails({
       submissionId,
-      application,
+      application: applicationWithSubmissionDate,
       athletePdf,
       nationalIdPdf,
       signatureCertificatePdf,
@@ -117,7 +136,7 @@ export async function POST(request: Request) {
     try {
       deliveryState.supportNotificationAttempted = true;
       await sendSupportFighterSubmissionNotification({
-        application,
+        application: applicationWithSubmissionDate,
         uploads,
         submittedAt,
         submissionId,
@@ -136,7 +155,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const promoterRecipient = await sendPromoterNotificationEmail(application, submissionId);
+    const promoterRecipient = await sendPromoterNotificationEmail(applicationWithSubmissionDate, submissionId, submittedAt);
     deliveryState.completedStep = "secondary_notifications_attempted";
 
     return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient, deliveryState });
@@ -208,6 +227,7 @@ function classifySubmissionError(message: string, error: unknown) {
   }
   if (error instanceof MissingRequiredUploadsError) return "Upload Validation Failure";
   if (error instanceof NoSelectedEmailAttachmentsError) return "No Selected Email Attachments";
+  if (message.toLowerCase().includes("official pdf generation failed")) return "PDF Generation Failure";
   if (message.toLowerCase().includes("signature certification pdf")) return "PDF Generation Failure";
   if (message.startsWith("Missing required email environment variable")) return "Missing Required Environment Variable";
   if (message.startsWith("Resend email failed")) return "Email Sending Failure";
@@ -228,6 +248,32 @@ function deliveryStateDetails(deliveryState: DeliveryState) {
     `Fighter confirmation email sent: ${deliveryState.fighterConfirmationEmailSent ? "yes" : "no"}`,
     `Support notification email attempted: ${deliveryState.supportNotificationAttempted ? "yes" : "no"}`
   ];
+}
+
+async function serverGeneratedOfficialPdf(kind: "athlete" | "nationalId", application: ApplicationData) {
+  try {
+    const templatePath = kind === "athlete" ? athleteLicenseTemplatePath : nationalIdTemplatePath;
+    const templateBytes = await readPublicTemplate(templatePath);
+    const pdfBytes =
+      kind === "athlete"
+        ? await generateAthleteLicensePdf(templateBytes, application)
+        : await generateNationalIdPdf(templateBytes, application);
+
+    return {
+      filename: kind === "athlete" ? "completed-athlete-license.pdf" : "completed-national-mma-id.pdf",
+      content: Buffer.from(pdfBytes),
+      contentType: "application/pdf"
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown PDF generation error.";
+    throw new Error(`Official PDF generation failed: ${message}`);
+  }
+}
+
+async function readPublicTemplate(templatePath: string) {
+  const relativePath = templatePath.replace(/^\/+/, "");
+  const file = await readFile(path.join(process.cwd(), "public", ...relativePath.split("/")));
+  return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
 }
 
 async function signatureCertificateAttachment({
