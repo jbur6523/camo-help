@@ -29,6 +29,9 @@ export function AdminPromotersDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [busyPromoterId, setBusyPromoterId] = useState("");
   const [message, setMessage] = useState("");
+  const [denyingPromoterId, setDenyingPromoterId] = useState("");
+  const [denialReason, setDenialReason] = useState("");
+  const [denialError, setDenialError] = useState("");
 
   useEffect(() => {
     loadPromoters();
@@ -94,12 +97,39 @@ export function AdminPromotersDashboard() {
                     key={action}
                     type="button"
                     disabled={busyPromoterId === promoter.id}
-                    onClick={() => updatePromoterStatus(promoter.id, action)}
+                    onClick={() => (action === "deny" ? startDenial(promoter.id) : updatePromoterStatus(promoter.id, action))}
                   >
                     {busyPromoterId === promoter.id ? "Updating..." : actionLabels[action]}
                   </button>
                 ))}
               </div>
+              {denyingPromoterId === promoter.id ? (
+                <div className="field denial-reason-field">
+                  <label htmlFor={`denial-reason-${promoter.id}`}>Reason:</label>
+                  <textarea
+                    id={`denial-reason-${promoter.id}`}
+                    value={denialReason}
+                    onChange={(event) => {
+                      setDenialReason(event.currentTarget.value);
+                      setDenialError("");
+                    }}
+                  />
+                  {denialError ? <div className="error">{denialError}</div> : null}
+                  <div className="admin-actions">
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={busyPromoterId === promoter.id}
+                      onClick={() => confirmDenial(promoter.id)}
+                    >
+                      {busyPromoterId === promoter.id ? "Updating..." : "Confirm Denial"}
+                    </button>
+                    <button className="button ghost" type="button" disabled={busyPromoterId === promoter.id} onClick={cancelDenial}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
@@ -122,24 +152,47 @@ export function AdminPromotersDashboard() {
     }
   }
 
-  async function updatePromoterStatus(promoterId: string, action: PromoterAdminAction) {
+  async function updatePromoterStatus(promoterId: string, action: PromoterAdminAction, reason?: string) {
     setBusyPromoterId(promoterId);
     setMessage("");
     try {
       const response = await fetch(`/api/admin/promoters/${promoterId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action })
+        body: JSON.stringify({ action, denialReason: reason })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not update promoter.");
-      setMessage("Promoter status updated.");
+      setMessage(result.warning || "Promoter status updated.");
+      cancelDenial();
       await loadPromoters();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update promoter.");
     } finally {
       setBusyPromoterId("");
     }
+  }
+
+  function startDenial(promoterId: string) {
+    setDenyingPromoterId(promoterId);
+    setDenialReason("");
+    setDenialError("");
+    setMessage("");
+  }
+
+  function cancelDenial() {
+    setDenyingPromoterId("");
+    setDenialReason("");
+    setDenialError("");
+  }
+
+  async function confirmDenial(promoterId: string) {
+    const trimmedReason = denialReason.trim();
+    if (!trimmedReason) {
+      setDenialError("Reason is required.");
+      return;
+    }
+    await updatePromoterStatus(promoterId, "deny", trimmedReason);
   }
 }
 
