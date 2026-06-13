@@ -417,7 +417,6 @@ function buildApplicationEmailBody(application: ApplicationData, submittedItems:
     `Reference ID: ${submissionId || "Not assigned"}`,
     "",
     "Requirements Submitted:",
-    "",
     ...submittedItemLines(submittedItems)
   ].join("\n");
 }
