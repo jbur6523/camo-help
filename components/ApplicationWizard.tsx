@@ -281,7 +281,11 @@ export function ApplicationWizard() {
       <form className="wizard-body" onFocusCapture={scrollFocusedFieldIntoView} onSubmit={(event) => event.preventDefault()}>
         {globalError ? <div className="notice" style={{ marginBottom: 16 }}><strong>Check this:</strong> {globalError}</div> : null}
         {step === "requirements" ? (
-          <StepRequirementsNeeded form={form} rememberedSubmittedRequirements={rememberedSubmittedRequirements} />
+          <StepRequirementsNeeded
+            form={form}
+            rememberedSubmittedRequirements={rememberedSubmittedRequirements}
+            onResetRememberedRequirements={resetRememberedSubmittedRequirements}
+          />
         ) : null}
         {step === "applicantInfo" ? (
           <StepApplicantInfo form={form} mode={documentsOnly ? "documentsOnly" : nationalIdOnly ? "nationalIdOnly" : "full"} />
@@ -348,6 +352,13 @@ export function ApplicationWizard() {
       setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
       return { ...current, [key]: nextFiles };
     });
+    setGlobalError("");
+  }
+
+  function resetRememberedSubmittedRequirements() {
+    window.localStorage.removeItem(submittedRequirementsStorageKey);
+    setRememberedSubmittedRequirements([]);
+    setValue("requirementsNeeded", [...defaultApplicationData.requirementsNeeded], { shouldDirty: true, shouldValidate: true });
     setGlobalError("");
   }
 

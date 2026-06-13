@@ -12,10 +12,12 @@ import { requirementLabels, requirementOptions, type RequirementKey } from "@/li
 
 export function StepRequirementsNeeded({
   form,
-  rememberedSubmittedRequirements = []
+  rememberedSubmittedRequirements = [],
+  onResetRememberedRequirements
 }: {
   form: UseFormReturn<ApplicationData>;
   rememberedSubmittedRequirements?: RequirementKey[];
+  onResetRememberedRequirements?: () => void;
 }) {
   const { register, watch, formState } = form;
   const selected = watch("requirementsNeeded") || [];
@@ -39,6 +41,14 @@ export function StepRequirementsNeeded({
             <strong>Remembered on this device:</strong> You previously submitted {formatRememberedRequirements(rememberedSubmittedLabels)}.
           </p>
           <p>You can re-check anything you still need to submit again.</p>
+          {onResetRememberedRequirements ? (
+            <div className="remembered-requirements-reset">
+              <p>Use this if a different fighter is using this device.</p>
+              <button className="button secondary reset-requirements-button" type="button" onClick={onResetRememberedRequirements}>
+                Reset Requirements
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className="review-block">

@@ -749,6 +749,18 @@ textarea {
   margin-bottom: 14px;
 }
 
+.remembered-requirements-reset {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reset-requirements-button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 8px 14px;
+}
+
 .notice p {
   margin: 0 0 10px;
 }
