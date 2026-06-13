@@ -25,7 +25,7 @@ export function StepRequirementsNeeded({
   const showBloodworkRequirement = selected.includes("bloodwork");
   const rememberedSubmittedLabels = requirementOptions
     .filter((key) => rememberedSubmittedRequirements.includes(key))
-    .map((key) => requirementLabel(key));
+    .map((key) => rememberedRequirementLabel(key));
 
   return (
     <>
@@ -38,8 +38,13 @@ export function StepRequirementsNeeded({
       {rememberedSubmittedLabels.length ? (
         <div className="notice remembered-requirements-note">
           <p>
-            <strong>Remembered on this device:</strong> You previously submitted {formatRememberedRequirements(rememberedSubmittedLabels)}.
+            <strong>Remembered on this device:</strong> You previously submitted:
           </p>
+          <ul className="remembered-requirements-list">
+            {rememberedSubmittedLabels.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
           <p>You can re-check anything you still need to submit again.</p>
           {onResetRememberedRequirements ? (
             <div className="remembered-requirements-reset">
@@ -117,6 +122,16 @@ function requirementLabel(key: (typeof requirementOptions)[number]) {
   return requirementLabels[key];
 }
 
+function rememberedRequirementLabel(key: (typeof requirementOptions)[number]) {
+  if (key === "athleteLicenseApplication") return "Athlete License Application";
+  if (key === "nationalMmaIdApplication") return "National MMA ID";
+  if (key === "bloodwork") return "Blood Work";
+  if (key === "physical") return "Physical";
+  if (key === "photoId") return "Driver's License / State ID";
+  if (key === "headshot") return "Headshot";
+  return requirementLabels[key];
+}
+
 function requirementDownloadLink(key: (typeof requirementOptions)[number]) {
   if (key === "physical") {
     return {
@@ -133,10 +148,4 @@ function requirementDownloadLink(key: (typeof requirementOptions)[number]) {
     };
   }
   return null;
-}
-
-function formatRememberedRequirements(labels: string[]) {
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
 }
