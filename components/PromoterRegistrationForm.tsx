@@ -59,6 +59,7 @@ export function PromoterRegistrationForm() {
               value={form.lastPromotionDate}
               error={errors.lastPromotionDate}
               onChange={handleChange}
+              type="text"
               inputMode="numeric"
               maxLength={10}
               placeholder="MM/DD/YYYY"
