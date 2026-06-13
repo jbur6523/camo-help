@@ -146,22 +146,36 @@ export function buildSubmissionEmailMessages(
 ) {
   const name = fullName(payload.application);
   const requirementsNeeded = payload.application.requirementsNeeded || [];
-  const applicationAttachments = [
-    ...(requirementsNeeded.includes("athleteLicenseApplication") && payload.athletePdf ? [payload.athletePdf] : []),
-    ...(requirementsNeeded.includes("nationalMmaIdApplication") && payload.nationalIdPdf ? [payload.nationalIdPdf] : []),
-    ...(payload.signatureCertificatePdf ? [payload.signatureCertificatePdf] : []),
-    ...(requirementsNeeded.includes("headshot") ? payload.uploads.headshot || [] : []),
-    ...(requirementsNeeded.includes("photoId") ? payload.uploads.photoId || [] : [])
+  const applicationEmailItems = [
+    ...(requirementsNeeded.includes("athleteLicenseApplication") && payload.athletePdf
+      ? [{ label: "Athlete License Application / Waiver", attachments: [payload.athletePdf] }]
+      : []),
+    ...(requirementsNeeded.includes("nationalMmaIdApplication") && payload.nationalIdPdf
+      ? [{ label: "National MMA ID Application", attachments: [payload.nationalIdPdf] }]
+      : []),
+    ...(payload.signatureCertificatePdf ? [{ label: "Signature Certificate", attachments: [payload.signatureCertificatePdf] }] : []),
+    ...(requirementsNeeded.includes("photoId") && payload.uploads.photoId?.length
+      ? [{ label: "Driver's License / Government-Issued ID", attachments: payload.uploads.photoId }]
+      : []),
+    ...(requirementsNeeded.includes("headshot") && payload.uploads.headshot?.length
+      ? [{ label: "Headshot / Face Photo", attachments: payload.uploads.headshot }]
+      : [])
   ];
-  const uploadedMedicalAttachments = [
-    ...(payload.uploads.bloodwork || []),
-    ...(payload.uploads.physical || []),
-    ...(payload.uploads.cardio || [])
+  const applicationAttachments = applicationEmailItems.flatMap((item) => item.attachments);
+  const medicalEmailItems = [
+    ...(payload.uploads.bloodwork?.length ? [{ label: "Blood Work", attachments: payload.uploads.bloodwork }] : []),
+    ...(payload.uploads.physical?.length ? [{ label: "Physical Exam", attachments: payload.uploads.physical }] : []),
+    ...(payload.uploads.cardio?.length ? [{ label: "Cardio/EKG", attachments: payload.uploads.cardio }] : [])
   ];
+  const uploadedMedicalAttachments = medicalEmailItems.flatMap((item) => item.attachments);
+  const additionalMedicalItems = uploadedMedicalAttachments.length && payload.uploads.additional?.length
+    ? [{ label: "Additional Documentation", attachments: payload.uploads.additional }]
+    : [];
   const medicalAttachments = [
     ...uploadedMedicalAttachments,
-    ...(uploadedMedicalAttachments.length ? payload.uploads.additional || [] : [])
+    ...additionalMedicalItems.flatMap((item) => item.attachments)
   ];
+  const medicalSubmittedItems = [...medicalEmailItems, ...additionalMedicalItems].map((item) => item.label);
   const messages: SubmissionEmailMessage[] = [];
 
   if (applicationAttachments.length) {
@@ -169,7 +183,7 @@ export function buildSubmissionEmailMessages(
       kind: "application",
       to: applicationRecipient,
       subject: `Submission: ${name} - ${formatEmailDate(new Date())}`,
-      text: buildApplicationEmailBody(payload.application, applicationAttachments, payload.submissionId),
+      text: buildApplicationEmailBody(payload.application, applicationEmailItems.map((item) => item.label), payload.submissionId),
       attachments: applicationAttachments
     });
   }
@@ -179,7 +193,7 @@ export function buildSubmissionEmailMessages(
       kind: "medical",
       to: medicalRecipient,
       subject: buildMedicalEmailSubject(name, payload.uploads),
-      text: buildMedicalEmailBody(payload.application, payload.uploads),
+      text: buildMedicalEmailBody(payload.application, medicalSubmittedItems),
       attachments: medicalAttachments
     });
   }
@@ -393,7 +407,7 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
   }
 }
 
-function buildApplicationEmailBody(application: ApplicationData, applicationAttachments: EmailAttachment[], submissionId?: string) {
+function buildApplicationEmailBody(application: ApplicationData, submittedItems: string[], submissionId?: string) {
   return [
     complianceContactLine(application.email),
     "",
@@ -404,11 +418,11 @@ function buildApplicationEmailBody(application: ApplicationData, applicationAtta
     "",
     "Requirements Submitted:",
     "",
-    ...applicationRequirementLines(application, applicationAttachments)
+    ...submittedItemLines(submittedItems)
   ].join("\n");
 }
 
-function buildMedicalEmailBody(application: ApplicationData, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
+function buildMedicalEmailBody(application: ApplicationData, submittedItems: string[]) {
   return [
     complianceContactLine(application.email),
     "",
@@ -418,7 +432,7 @@ function buildMedicalEmailBody(application: ApplicationData, uploads: Partial<Re
     "",
     "Requirements Submitted:",
     "",
-    ...medicalRequirementLines(uploads)
+    ...submittedItemLines(submittedItems)
   ].join("\n");
 }
 
@@ -455,19 +469,6 @@ function complianceContactLine(fighterEmail: string) {
   return `This is being submitted by a third-party service. For issues of non-compliance, please contact the fighter directly at ${fighterEmail}.`;
 }
 
-function applicationRequirementLines(application: ApplicationData, applicationAttachments: EmailAttachment[]) {
-  const requirementsNeeded = application.requirementsNeeded || [];
-  const lines = [
-    ...(requirementsNeeded.includes("athleteLicenseApplication") ? ["* Athlete License Application"] : []),
-    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["* National MMA ID Application"] : []),
-    ...(requirementsNeeded.includes("photoId") ? ["* Driver's License / Government-Issued ID"] : []),
-    ...(requirementsNeeded.includes("headshot") ? ["* Headshot / Face Photo"] : [])
-  ];
-
-  if (lines.length) return lines;
-  return applicationAttachments.map((attachment) => `* ${attachment.filename}`);
-}
-
 function buildMedicalEmailSubject(name: string, uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
   const hasBloodwork = Boolean(uploads.bloodwork?.length);
   const hasPhysical = Boolean(uploads.physical?.length);
@@ -478,13 +479,8 @@ function buildMedicalEmailSubject(name: string, uploads: Partial<Record<UploadKe
   return `Submission: ${name} - Medical Documents`;
 }
 
-function medicalRequirementLines(uploads: Partial<Record<UploadKey, EmailAttachment[]>>) {
-  return [
-    ...(uploads.bloodwork?.length ? ["* Blood Work"] : []),
-    ...(uploads.physical?.length ? ["* Physical Exam"] : []),
-    ...(uploads.cardio?.length ? ["* Cardio/EKG"] : []),
-    ...(uploads.additional?.length ? ["* Additional Documentation"] : [])
-  ];
+function submittedItemLines(items: string[]) {
+  return items.length ? items.map((item) => `* ${item}`) : ["* Selected documents"];
 }
 
 function selectedSubmissionLines(application: ApplicationData) {
