@@ -218,7 +218,6 @@ export function ApplicationWizard() {
       <main className="app-shell">
         <section className="landing">
           <div>
-            <div className="brand-mark">CA</div>
             {configStatus?.betaMode ? <div className="beta-pill">Beta Mode</div> : null}
             <h1>CAMO Fighter Application Helper</h1>
             <p>Complete your Athlete License and National MMA ID paperwork from your phone.</p>
@@ -734,7 +733,6 @@ function SubmissionFailurePage({ failure }: { failure: SubmissionFailure }) {
   return (
     <main className="app-shell">
       <section className="wizard-body submission-failure-page">
-        <div className="brand-mark">CA</div>
         <h1 className="step-title">{isPartial ? "Submission Incomplete" : "Submission Failed"}</h1>
         <div className="notice submission-failure-notice">
           {isLargeUpload ? (

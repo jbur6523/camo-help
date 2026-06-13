@@ -22,7 +22,6 @@ export function SuccessPage({
   return (
     <main className="app-shell">
       <section className="wizard-body">
-        <div className="brand-mark">CA</div>
         <h1 className="step-title">Documents Submitted</h1>
         <p className="step-help">
           {documentsOnly
