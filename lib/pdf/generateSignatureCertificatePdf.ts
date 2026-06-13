@@ -61,17 +61,23 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
   };
 
   const drawSection = (title: string) => {
-    y -= 12;
-    ensureSpace(42);
+    y -= 14;
+    ensureSpace(48);
+    page.drawText(title, {
+      x: margin,
+      y,
+      size: headingSize,
+      font: boldFont,
+      color: rgb(0.08, 0.1, 0.12)
+    });
+    y -= 10;
     page.drawLine({
       start: { x: margin, y },
       end: { x: pageWidth - margin, y },
       thickness: 0.8,
       color: rgb(0.72, 0.76, 0.74)
     });
-    y -= 18;
-    drawText(title, { font: boldFont, size: headingSize });
-    y -= 4;
+    y -= 14;
   };
 
   const drawRow = (label: string, value: string) => {
@@ -96,6 +102,33 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
       });
     });
     y -= Math.max(1, valueLines.length) * lineHeight + 3;
+  };
+
+  const drawBulletList = (items: string[]) => {
+    const bulletX = margin + 8;
+    const textX = margin + 24;
+    const textMaxWidth = pageWidth - margin - textX;
+    items.forEach((item) => {
+      const lines = wrapText(item, regularFont, bodySize, textMaxWidth);
+      ensureSpace(lines.length * lineHeight + 7);
+      page.drawText("-", {
+        x: bulletX,
+        y,
+        size: bodySize,
+        font: regularFont,
+        color: rgb(0.08, 0.1, 0.12)
+      });
+      lines.forEach((line, index) => {
+        page.drawText(line, {
+          x: textX,
+          y: y - index * lineHeight,
+          size: bodySize,
+          font: regularFont,
+          color: rgb(0.08, 0.1, 0.12)
+        });
+      });
+      y -= lines.length * lineHeight + 7;
+    });
   };
 
   page.drawText("Certificate of Signature", {
@@ -126,15 +159,15 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
   drawRow("Phone number:", input.application.phone || "Not provided");
 
   drawSection("Certified Documents");
-  input.certifiedDocuments.forEach((documentName) => drawText(`- ${documentName}`));
-  y -= 4;
+  drawBulletList(input.certifiedDocuments);
+  y -= 2;
   drawRow("Document completed:", formatPacificLongDate(input.submittedAt));
 
   drawSection("Confirmation Info");
-  drawText("Confirmation checkbox language accepted during submission:", { font: boldFont });
-  signatureConfirmationCheckboxLanguageFor(input.application.requirementsNeeded).forEach((line) => drawText(`- ${line}`));
-  y -= 2;
-  drawText("Certification statement:", { font: boldFont });
+  drawText("Accepted confirmations:", { font: boldFont, gapAfter: 2 });
+  drawBulletList(signatureConfirmationCheckboxLanguageFor(input.application.requirementsNeeded));
+  y -= 7;
+  drawText("Certification statement:", { font: boldFont, gapAfter: 3 });
   drawText(signatureCertificationStatement);
 
   return pdfDoc.save();
