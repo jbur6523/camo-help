@@ -447,7 +447,9 @@ function applicationRequirementLines(application: ApplicationData, applicationAt
   const requirementsNeeded = application.requirementsNeeded || [];
   const lines = [
     ...(requirementsNeeded.includes("athleteLicenseApplication") ? ["* Athlete License Application"] : []),
-    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["* National MMA ID Application"] : [])
+    ...(requirementsNeeded.includes("nationalMmaIdApplication") ? ["* National MMA ID Application"] : []),
+    ...(requirementsNeeded.includes("photoId") ? ["* Driver's License / Government-Issued ID"] : []),
+    ...(requirementsNeeded.includes("headshot") ? ["* Headshot / Face Photo"] : [])
   ];
 
   if (lines.length) return lines;
