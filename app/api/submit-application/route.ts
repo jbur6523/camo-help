@@ -13,7 +13,7 @@ import {
 } from "@/lib/email/supportNotifications";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
-import type { SignatureAuditPayload, SignatureLocationAudit } from "@/lib/signatureAudit";
+import type { ApproximateIpLocation } from "@/lib/signatureAudit";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName } from "@/lib/types";
 import { independentPromoterId } from "@/lib/promoters/constants";
@@ -64,9 +64,9 @@ export async function POST(request: Request) {
     const application = JSON.parse(applicationJson) as ApplicationData;
     applicationForError = application;
     deliveryState.completedStep = "application_payload_parsed";
-    const signatureAudit = parseSignatureAudit(formData.get("signatureAudit"));
     const ipAddress = clientIpFromHeaders(request.headers);
     const userAgent = request.headers.get("user-agent") || "Unavailable";
+    const approximateIpLocation = approximateIpLocationFromHeaders(request.headers);
     const athletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const nationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
           certifiedDocuments,
           ipAddress,
           userAgent,
-          location: signatureAudit.location
+          approximateIpLocation
         })
       : undefined;
     deliveryState.completedStep = "signature_certificate_generated";
@@ -239,7 +239,7 @@ async function signatureCertificateAttachment({
   certifiedDocuments,
   ipAddress,
   userAgent,
-  location
+  approximateIpLocation
 }: {
   submissionId: string;
   submittedAt: Date;
@@ -247,7 +247,7 @@ async function signatureCertificateAttachment({
   certifiedDocuments: string[];
   ipAddress: string;
   userAgent: string;
-  location: SignatureLocationAudit;
+  approximateIpLocation: ApproximateIpLocation;
 }) {
   try {
     const certificateBytes = await generateSignatureCertificatePdf({
@@ -257,7 +257,7 @@ async function signatureCertificateAttachment({
       certifiedDocuments,
       ipAddress,
       userAgent,
-      location
+      approximateIpLocation
     });
     console.info("Signature certificate PDF generated.", {
       submissionId,
@@ -282,54 +282,35 @@ function certifiedApplicationDocuments(application: ApplicationData) {
   ];
 }
 
-function parseSignatureAudit(value: FormDataEntryValue | null): { location: SignatureLocationAudit } {
-  if (typeof value !== "string" || !value.trim()) {
-    return { location: unavailableLocation("Not collected") };
-  }
-
-  try {
-    const parsed = JSON.parse(value) as SignatureAuditPayload;
-    return { location: normalizeLocation(parsed.location) };
-  } catch {
-    return { location: unavailableLocation("Invalid location audit payload") };
-  }
-}
-
-function normalizeLocation(location: SignatureAuditPayload["location"]): SignatureLocationAudit {
-  if (!location) return unavailableLocation("Not collected");
-  if (location.status === "denied") {
-    return { status: "denied", timestamp: stringOrUndefined(location.timestamp) };
-  }
-  if (location.status === "granted") {
-    return {
-      status: "granted",
-      latitude: finiteNumber(location.latitude),
-      longitude: finiteNumber(location.longitude),
-      accuracy: finiteNumber(location.accuracy),
-      timestamp: stringOrUndefined(location.timestamp) || new Date().toISOString()
-    };
-  }
-  return {
-    status: "unavailable",
-    reason: stringOrUndefined(location.reason) || "Not collected",
-    timestamp: stringOrUndefined(location.timestamp)
-  };
-}
-
-function unavailableLocation(reason: string): SignatureLocationAudit {
-  return { status: "unavailable", reason, timestamp: new Date().toISOString() };
-}
-
-function finiteNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function stringOrUndefined(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
 function clientIpFromHeaders(headers: Headers) {
   const forwardedFor = headers.get("x-forwarded-for");
   if (forwardedFor) return forwardedFor.split(",")[0]?.trim() || "Unavailable";
   return headers.get("x-real-ip") || "Unavailable";
+}
+
+function approximateIpLocationFromHeaders(headers: Headers): ApproximateIpLocation {
+  const city = decodedHeader(headers, "x-vercel-ip-city");
+  const region = decodedHeader(headers, "x-vercel-ip-country-region");
+  const country = decodedHeader(headers, "x-vercel-ip-country");
+  const latitude = decodedHeader(headers, "x-vercel-ip-latitude");
+  const longitude = decodedHeader(headers, "x-vercel-ip-longitude");
+  const postalCode = decodedHeader(headers, "x-vercel-ip-postal-code");
+  const display = [city, region, country].filter(Boolean).join(", ") || "Unavailable";
+
+  return {
+    display,
+    ...(latitude ? { latitude } : {}),
+    ...(longitude ? { longitude } : {}),
+    ...(postalCode ? { postalCode } : {})
+  };
+}
+
+function decodedHeader(headers: Headers, name: string) {
+  const value = headers.get(name);
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }

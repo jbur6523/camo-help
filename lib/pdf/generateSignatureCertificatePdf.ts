@@ -3,7 +3,7 @@ import { formatPacificDateTime } from "@/lib/dates";
 import {
   signatureCertificationStatement,
   signatureConfirmationCheckboxLanguage,
-  type SignatureLocationAudit
+  type ApproximateIpLocation
 } from "@/lib/signatureAudit";
 import type { ApplicationData } from "@/lib/types";
 import { fullName } from "@/lib/types";
@@ -15,7 +15,7 @@ export type SignatureCertificateInput = {
   certifiedDocuments: string[];
   ipAddress: string;
   userAgent: string;
-  location: SignatureLocationAudit;
+  approximateIpLocation: ApproximateIpLocation;
 };
 
 const pageWidth = 612;
@@ -107,9 +107,12 @@ export async function generateSignatureCertificatePdf(input: SignatureCertificat
   drawSection("Audit Info");
   drawLabelValue(page, boldFont, regularFont, "IP address:", input.ipAddress || "Unavailable", y);
   y -= lineHeight;
+  drawLabelValue(page, boldFont, regularFont, "Approximate Location by IP:", input.approximateIpLocation.display || "Unavailable", y);
+  y -= lineHeight;
+  drawLabelValue(page, boldFont, regularFont, "Approximate IP coordinates:", formatApproximateIpCoordinates(input.approximateIpLocation), y);
+  y -= lineHeight;
   drawText("Device/browser information:", { font: boldFont });
   drawText(input.userAgent || "Unavailable", { indent: 14 });
-  drawText(`Location status: ${formatLocation(input.location)}`);
 
   drawSection("Confirmation");
   drawText("Confirmation checkbox language accepted during submission:", { font: boldFont });
@@ -130,7 +133,7 @@ function drawLabelValue(page: PDFPage, boldFont: PDFFont, regularFont: PDFFont, 
     color: rgb(0.08, 0.1, 0.12)
   });
   page.drawText(value, {
-    x: margin + 128,
+    x: margin + 164,
     y,
     size: bodySize,
     font: regularFont,
@@ -157,14 +160,9 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   return lines.length ? lines : [""];
 }
 
-function formatLocation(location: SignatureLocationAudit) {
-  if (location.status === "granted") {
-    return `Location granted. Latitude: ${location.latitude.toFixed(6)}. Longitude: ${location.longitude.toFixed(
-      6
-    )}. Accuracy: ${Math.round(location.accuracy)} meters. Timestamp: ${location.timestamp}.`;
+function formatApproximateIpCoordinates(location: ApproximateIpLocation) {
+  if (location.latitude && location.longitude) {
+    return `${location.latitude}, ${location.longitude}`;
   }
-  if (location.status === "denied") {
-    return `Location permission denied${location.timestamp ? ` at ${location.timestamp}` : ""}.`;
-  }
-  return `Location unavailable${location.reason ? `: ${location.reason}` : ""}${location.timestamp ? ` at ${location.timestamp}` : ""}.`;
+  return "Unavailable";
 }

@@ -1,23 +1,8 @@
-export type SignatureLocationAudit =
-  | {
-      status: "granted";
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-      timestamp: string;
-    }
-  | {
-      status: "denied";
-      timestamp?: string;
-    }
-  | {
-      status: "unavailable";
-      reason?: string;
-      timestamp?: string;
-    };
-
-export type SignatureAuditPayload = {
-  location?: SignatureLocationAudit | null;
+export type ApproximateIpLocation = {
+  display: string;
+  latitude?: string;
+  longitude?: string;
+  postalCode?: string;
 };
 
 export const signatureConfirmationCheckboxLanguage = [
