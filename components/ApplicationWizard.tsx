@@ -34,6 +34,7 @@ import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 
 const storageKey = "camo-help-application-v1";
 const submittedRequirementsStorageKey = "camo-help-submitted-requirements-v1";
+const CAMO_PROFILE_URL = "https://camomma.org/Users-register";
 
 type StepId =
   | "requirements"
@@ -129,6 +130,7 @@ const imageUploadCompression: Record<UploadKey, { maxDimension: number; quality:
 
 export function ApplicationWizard() {
   const [started, setStarted] = useState(false);
+  const [showCamoProfileModal, setShowCamoProfileModal] = useState(false);
   const [step, setStep] = useState<StepId>("requirements");
   const [uploadFiles, setUploadFiles] = useState<UploadedFiles>({});
   const [globalError, setGlobalError] = useState("");
@@ -254,13 +256,36 @@ export function ApplicationWizard() {
             </ul>
           </div>
           <div className="landing-actions">
-            <button className="button primary" type="button" onClick={() => setStarted(true)}>
+            <button className="button primary" type="button" onClick={() => setShowCamoProfileModal(true)}>
               Start Application
             </button>
             <a className="button promoter-registration-button" href="/promoter-registration">
               Promoter Registration
             </a>
           </div>
+          {showCamoProfileModal ? (
+            <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="camo-profile-title">
+              <div className="modal-card">
+                <h2 id="camo-profile-title">Are you currently registered on CAMO?</h2>
+                <p>Fighters must have a CAMO profile before submitting forms through CAMO Help.</p>
+                <div className="modal-actions">
+                  <button
+                    className="button primary"
+                    type="button"
+                    onClick={() => {
+                      setShowCamoProfileModal(false);
+                      setStarted(true);
+                    }}
+                  >
+                    Yes
+                  </button>
+                  <a className="button secondary" href={CAMO_PROFILE_URL} target="_blank" rel="noopener noreferrer">
+                    Create CAMO Profile
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </main>
     );

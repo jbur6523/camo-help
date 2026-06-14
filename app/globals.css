@@ -124,6 +124,50 @@ textarea {
   text-decoration: none;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 28, 24, 0.48);
+}
+
+.modal-card {
+  width: min(100%, 420px);
+  padding: 22px;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 60px rgba(21, 27, 31, 0.24);
+}
+
+.modal-card h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  line-height: 1.16;
+}
+
+.modal-card p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.modal-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.modal-actions .button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
 .wizard-header {
   position: sticky;
   top: 0;
