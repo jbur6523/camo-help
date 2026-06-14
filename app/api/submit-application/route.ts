@@ -19,6 +19,7 @@ import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
+import { turnstileErrorStatus, turnstileUserMessage, verifyTurnstileToken } from "@/lib/security/turnstile";
 import type { ApproximateIpLocation } from "@/lib/signatureAudit";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName } from "@/lib/types";
@@ -52,8 +53,28 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const submittedId = formData.get("submissionId");
     submissionId = typeof submittedId === "string" && submittedId.trim() ? submittedId.trim() : createSubmissionReferenceId();
+    const ipAddress = clientIpFromHeaders(request.headers);
     pruneProcessedSubmissionIds();
     console.info("API submission request received.", { submissionId });
+
+    try {
+      await verifyTurnstileToken(formData.get("turnstileToken"), ipAddress);
+      deliveryState.completedStep = "turnstile_verified";
+      console.info("Turnstile verification passed for fighter submission.", { submissionId });
+    } catch (turnstileError) {
+      const message = turnstileUserMessage(turnstileError);
+      console.warn("Turnstile verification blocked fighter submission.", { submissionId, message });
+      return NextResponse.json(
+        {
+          error: message,
+          code: turnstileErrorStatus(turnstileError) === 500 ? "turnstile_not_configured" : "turnstile_failed",
+          submissionId,
+          failureKind: "failed",
+          deliveryState
+        },
+        { status: turnstileErrorStatus(turnstileError) }
+      );
+    }
 
     if (processedSubmissionIds.has(submissionId)) {
       console.warn("Duplicate API submission skipped.", { submissionId });
@@ -70,7 +91,6 @@ export async function POST(request: Request) {
     const application = JSON.parse(applicationJson) as ApplicationData;
     applicationForError = application;
     deliveryState.completedStep = "application_payload_parsed";
-    const ipAddress = clientIpFromHeaders(request.headers);
     const approximateIpLocation = approximateIpLocationFromHeaders(request.headers);
     const submittedAthletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
     const submittedNationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");

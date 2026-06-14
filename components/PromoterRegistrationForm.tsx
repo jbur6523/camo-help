@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { promoterRegistrationSchema, type PromoterRegistrationInput } from "@/lib/promoters/registrationSchema";
 
 type FieldName = keyof PromoterRegistrationInput;
@@ -14,6 +15,8 @@ const initialForm: PromoterRegistrationInput = {
   websiteUrl: ""
 };
 
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
 export function PromoterRegistrationForm() {
   const [form, setForm] = useState<PromoterRegistrationInput>(initialForm);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -21,6 +24,9 @@ export function PromoterRegistrationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [governmentIdFile, setGovernmentIdFile] = useState<File | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   return (
     <main className="app-shell">
@@ -99,6 +105,16 @@ export function PromoterRegistrationForm() {
               onChange={handleChange}
               required
             />
+            <TurnstileWidget
+              siteKey={turnstileSiteKey}
+              resetKey={turnstileResetKey}
+              errorMessage={turnstileError}
+              onTokenChange={(token) => {
+                setTurnstileToken(token);
+                if (token) setTurnstileError("");
+              }}
+              onErrorMessageChange={setTurnstileError}
+            />
             <button className="button primary" type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit Registration"}
             </button>
@@ -130,6 +146,14 @@ export function PromoterRegistrationForm() {
       setGlobalMessage("Please complete the required fields.");
       return;
     }
+    if (!turnstileToken) {
+      const message = turnstileSiteKey
+        ? "Complete the verification before submitting."
+        : "Submission verification is not configured. Please contact support before submitting.";
+      setTurnstileError(message);
+      setGlobalMessage(message);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -138,6 +162,7 @@ export function PromoterRegistrationForm() {
         formData.append(key, value || "");
       });
       formData.append("governmentId", governmentIdFile);
+      formData.append("turnstileToken", turnstileToken);
 
       const response = await fetch("/api/promoter-registration", {
         method: "POST",
@@ -145,6 +170,11 @@ export function PromoterRegistrationForm() {
       });
       const result = await response.json();
       if (!response.ok) {
+        if (result.code === "turnstile_failed" || result.code === "turnstile_not_configured") {
+          setTurnstileToken("");
+          setTurnstileResetKey((current) => current + 1);
+          setTurnstileError(result.error || "Verification could not be completed. Please try again.");
+        }
         setErrors(toFieldErrors(result.fieldErrors || {}));
         throw new Error(result.error || "Registration failed.");
       }

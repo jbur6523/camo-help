@@ -310,6 +310,20 @@ textarea {
   font-weight: 700;
 }
 
+.turnstile-box {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.turnstile-widget {
+  max-width: 100%;
+  min-height: 65px;
+  overflow: hidden;
+}
+
 .choice-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

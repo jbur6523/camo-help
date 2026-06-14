@@ -11,6 +11,7 @@ import { StepLegalQuestions } from "@/components/StepLegalQuestions";
 import { StepUploads } from "@/components/StepUploads";
 import { StepReview } from "@/components/StepReview";
 import { SuccessPage } from "@/components/SuccessPage";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { WizardBottomNav } from "@/components/WizardBottomNav";
 import { combatTrioPhoneDisplay, combatTrioPhoneHref } from "@/lib/medicalRequirements";
 import { formatPacificDate } from "@/lib/dates";
@@ -35,6 +36,7 @@ import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 const storageKey = "camo-help-application-v1";
 const submittedRequirementsStorageKey = "camo-help-submitted-requirements-v1";
 const CAMO_PROFILE_URL = "https://camomma.org/Users-register";
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 type StepId =
   | "requirements"
@@ -106,6 +108,7 @@ type SubmitApplicationResponse = {
   failureKind?: "failed" | "partial";
   fighterConfirmationRecipient?: string;
   error?: string;
+  code?: string;
   deliveryState?: SubmissionDeliveryState;
 };
 
@@ -145,6 +148,9 @@ export function ApplicationWizard() {
   const [pendingSubmissionId, setPendingSubmissionId] = useState("");
   const [submissionFailure, setSubmissionFailure] = useState<SubmissionFailure | null>(null);
   const [rememberedSubmittedRequirements, setRememberedSubmittedRequirements] = useState<RequirementKey[]>([]);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const submissionInFlightRef = useRef(false);
 
   const form = useForm<ApplicationData>({
@@ -335,6 +341,14 @@ export function ApplicationWizard() {
             onGenerate={confirmEmailAndGenerateForms}
             onSubmit={submitDocuments}
             documentsOnly={documentsOnly}
+            turnstileSiteKey={turnstileSiteKey}
+            turnstileError={turnstileError}
+            turnstileResetKey={turnstileResetKey}
+            onTurnstileTokenChange={(token) => {
+              setTurnstileToken(token);
+              if (token) setTurnstileError("");
+            }}
+            onTurnstileErrorChange={setTurnstileError}
           />
         ) : null}
       </form>
@@ -644,10 +658,22 @@ export function ApplicationWizard() {
         setSubmissionFailure({ kind: "failed", submissionId });
         return;
       }
+      if (!turnstileToken) {
+        const message = turnstileSiteKey
+          ? "Complete the verification before submitting."
+          : "Submission verification is not configured. Please contact support before submitting.";
+        setTurnstileError(message);
+        setGlobalError(message);
+        submissionInFlightRef.current = false;
+        setIsBusy(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const values = form.getValues();
       const formData = new FormData();
       formData.append("submissionId", submissionId);
       formData.append("application", JSON.stringify(values));
+      formData.append("turnstileToken", turnstileToken);
       if (generated.athleteBlob) {
         formData.append("athletePdf", new File([generated.athleteBlob], "completed-athlete-license.pdf", { type: "application/pdf" }));
       }
@@ -677,6 +703,15 @@ export function ApplicationWizard() {
       const parsedResponse = await readSubmitApplicationResponse(response);
       const result: SubmitApplicationResponse = parsedResponse.json || {};
       if (!response.ok) {
+        if (isTurnstileSubmissionError(result)) {
+          const message = result.error || "Verification could not be completed. Please try again.";
+          setTurnstileError(message);
+          setGlobalError(message);
+          setTurnstileToken("");
+          setTurnstileResetKey((current) => current + 1);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         const largeUploadRejection = isLargeUploadRejection(response.status, parsedResponse.text);
         if (!parsedResponse.json) {
           void notifyClientSupportError({
@@ -839,7 +874,12 @@ function GenerateStep({
   onEmailChange,
   onGenerate,
   onSubmit,
-  documentsOnly
+  documentsOnly,
+  turnstileSiteKey,
+  turnstileError,
+  turnstileResetKey,
+  onTurnstileTokenChange,
+  onTurnstileErrorChange
 }: {
   pdfs: GeneratedPdfs | null;
   isBusy: boolean;
@@ -849,6 +889,11 @@ function GenerateStep({
   onGenerate: () => Promise<void>;
   onSubmit: () => Promise<void>;
   documentsOnly: boolean;
+  turnstileSiteKey: string;
+  turnstileError: string;
+  turnstileResetKey: number;
+  onTurnstileTokenChange: (token: string) => void;
+  onTurnstileErrorChange: (message: string) => void;
 }) {
   const hasCurrentGeneratedForms = Boolean(pdfs && pdfs.email === email.trim());
 
@@ -903,6 +948,13 @@ function GenerateStep({
                 ) : null}
               </div>
             ) : null}
+            <TurnstileWidget
+              siteKey={turnstileSiteKey}
+              resetKey={turnstileResetKey}
+              errorMessage={turnstileError}
+              onTokenChange={onTurnstileTokenChange}
+              onErrorMessageChange={onTurnstileErrorChange}
+            />
             <button className="button primary submit-documents-button" type="button" onClick={onSubmit} disabled={isBusy}>
               {isBusy ? "Working..." : "Submit Documents"}
             </button>
@@ -1117,6 +1169,10 @@ async function readSubmitApplicationResponse(response: Response): Promise<{
 function isLargeUploadRejection(status: number, responseText: string) {
   const normalized = responseText.trim().toLowerCase();
   return status === 413 || normalized.startsWith("request entity too large") || normalized.startsWith("request body too large");
+}
+
+function isTurnstileSubmissionError(result: SubmitApplicationResponse) {
+  return result.code === "turnstile_failed" || result.code === "turnstile_not_configured";
 }
 
 function buildClientSubmissionErrorDetails({

@@ -4,6 +4,7 @@ import {
   sendSupportPromoterRegistrationNotification
 } from "@/lib/email/supportNotifications";
 import { promoterRegistrationSchema, type PromoterRegistration } from "@/lib/promoters/registrationSchema";
+import { turnstileErrorStatus, turnstileUserMessage, verifyTurnstileToken } from "@/lib/security/turnstile";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -28,6 +29,21 @@ export async function POST(request: Request) {
       userShownOutcome: "failure"
     });
     return NextResponse.json({ error: "Invalid registration payload." }, { status: 400 });
+  }
+
+  try {
+    await verifyTurnstileToken(formData.get("turnstileToken"), clientIpFromHeaders(request.headers));
+    console.info("Turnstile verification passed for promoter registration.");
+  } catch (turnstileError) {
+    const message = turnstileUserMessage(turnstileError);
+    console.warn("Turnstile verification blocked promoter registration.", { message });
+    return NextResponse.json(
+      {
+        error: message,
+        code: turnstileErrorStatus(turnstileError) === 500 ? "turnstile_not_configured" : "turnstile_failed"
+      },
+      { status: turnstileErrorStatus(turnstileError) }
+    );
   }
 
   const body = {
@@ -127,6 +143,12 @@ function isAllowedGovernmentIdAttachment(attachment: EmailAttachment) {
   const contentType = attachment.contentType || "";
   const filename = attachment.filename.toLowerCase();
   return contentType.startsWith("image/") || contentType === "application/pdf" || /\.(pdf|jpe?g|png|heic|heif|webp)$/i.test(filename);
+}
+
+function clientIpFromHeaders(headers: Headers) {
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0]?.trim() || "Unavailable";
+  return headers.get("x-real-ip") || "Unavailable";
 }
 
 async function sendPromoterPendingVerificationEmail(registration: PromoterRegistration) {
