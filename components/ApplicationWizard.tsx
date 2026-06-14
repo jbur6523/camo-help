@@ -948,6 +948,9 @@ function GenerateStep({
                 ) : null}
               </div>
             ) : null}
+            <button className="button primary submit-documents-button" type="button" onClick={onSubmit} disabled={isBusy}>
+              {isBusy ? "Working..." : "Submit Documents"}
+            </button>
             <TurnstileWidget
               siteKey={turnstileSiteKey}
               resetKey={turnstileResetKey}
@@ -955,9 +958,6 @@ function GenerateStep({
               onTokenChange={onTurnstileTokenChange}
               onErrorMessageChange={onTurnstileErrorChange}
             />
-            <button className="button primary submit-documents-button" type="button" onClick={onSubmit} disabled={isBusy}>
-              {isBusy ? "Working..." : "Submit Documents"}
-            </button>
           </>
         ) : null}
       </div>
