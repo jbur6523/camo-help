@@ -68,7 +68,7 @@ test("coordinator blocks duplicate checks, supports cancellation, and ignores la
     reasonCode: "DUPLICATE_REQUEST"
   });
   coordinator.cancel();
-  resolve({ kind: "result", result: { status: "pass", reasonCode: "NO_OBVIOUS_ISSUE", confidence: "high" } });
+  resolve({ kind: "result", result: { status: "pass", reasonCodes: ["NO_OBVIOUS_ISSUE"], confidence: "high" } });
   assert.equal(await pending, null);
   assert.equal(coordinator.isRunning, false);
 });
@@ -90,6 +90,17 @@ test("rate-limit boundary uses keyed identifiers and test double enforces concur
   });
 });
 
+test("provider budget is consumed only at the provider boundary", async () => {
+  const limiter = new MemoryDocumentCheckRateLimiter({ burst: 3, burstWindowMs: 60_000, daily: 10, monthly: 1, concurrent: 1 });
+  const lease = await limiter.acquire({ clientIdentifierHash: "synthetic-hash", now: 1_000 });
+  assert.equal(lease.allowed, true);
+  if (lease.allowed) {
+    assert.equal((await limiter.consumeProviderBudget(lease.leaseId)).allowed, true);
+    assert.deepEqual(await limiter.consumeProviderBudget(lease.leaseId), { allowed: false, reasonCode: "MONTHLY_USAGE_LIMIT" });
+    await limiter.release(lease.leaseId);
+  }
+});
+
 test("normal submission stays independent after every optional AI outcome", () => {
   const outcomes: DocumentCheckOutcome[] = [
     { kind: "unavailable", reasonCode: "TIMEOUT" },
@@ -97,7 +108,7 @@ test("normal submission stays independent after every optional AI outcome", () =
     { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_RESPONSE" },
     { kind: "unavailable", reasonCode: "RATE_LIMIT_REACHED" },
     { kind: "unavailable", reasonCode: "UNSUPPORTED_FILE" },
-    { kind: "result", result: { status: "review", reasonCode: "SIGNATURE_NOT_FOUND", confidence: "medium" } }
+    { kind: "result", result: { status: "review", reasonCodes: ["SIGNATURE_NOT_FOUND"], confidence: "medium" } }
   ];
   for (const outcome of outcomes) {
     const application = { ...defaultApplicationData, requirementsNeeded: ["bloodwork"] as RequirementKey[] };

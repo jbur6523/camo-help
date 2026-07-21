@@ -2,9 +2,9 @@
 
 ## Status
 
-This phase prepares the repository for a later, manual and optional document pre-check. It does not create `POST /api/document-check`, call an AI service, add a provider SDK or API key, or add an AI user interface. The existing submission route remains independent of all document-check code.
+This phase now includes the optional, manual `POST /api/document-check` boundary, an OpenAI Responses API provider, a durable Upstash adapter, and the upload-step control. It is disabled by default and no validation command makes a live provider request. The existing submission route remains independent of all document-check code.
 
-Infrastructure readiness after this phase: **not yet approved for live AI traffic**. The code boundary, validation, request policy, cancellation model, fixed messages, and test provider are ready. A durable production rate-limit/usage backend and a provider privacy/contract decision remain blocking work.
+Infrastructure readiness after this phase: **operationally prepared but disabled**. Before enabling production traffic, configure and test Upstash atomically, complete provider privacy/contract review, and perform a security review of the deployment configuration.
 
 ## Completed remediation
 
@@ -16,6 +16,10 @@ Infrastructure readiness after this phase: **not yet approved for live AI traffi
 - Removed filenames, per-document labels, raw response previews, and provider error text from submission diagnostic details and logs. Attachment logging remains aggregate-only.
 - Added a document-check provider interface, strict result schema, deterministic no-network mock, timeout handling, cancellation/late-response protection, and duplicate-request protection.
 - Added a durable rate-limiter interface, keyed identifier hashing, and a deterministic memory-backed test double. The memory implementation is explicitly test-only.
+- Added `app/api/document-check/route.ts` with one-file/category validation, dynamic execution, fail-closed controls, fixed public states, and no-store response headers.
+- Added a server-only OpenAI Responses provider using `store: false`, strict JSON schema output, high visual detail, direct in-memory image/PDF input, no tools/background/files API, and prompt-injection-resistant instructions. The implementation follows the [Responses API input and structured-output contract](https://platform.openai.com/docs/api-reference/responses) and must still be reviewed against the selected model’s current capability and retention terms.
+- Added an Upstash Redis/ratelimit adapter with analytics disabled, HMAC client keys, burst/daily/concurrency limits, and an atomic calendar-month provider budget. Upstash failures return unavailable and never fall back to the memory test double.
+- Added an optional manual per-file control in `components/StepUploads.tsx`. Its state is transient React state; cancellation and late-result suppression never affect normal navigation or submission.
 - Added synthetic tests. No real medical record, identity document, fighter data, provider data, or lab result is used.
 
 ## Supported file policies
@@ -134,11 +138,17 @@ The normal submission route must never call the checker, wait for it, consume it
 
 ## Provider boundary and fixed result wording
 
-The provider accepts only an already validated in-memory document and an abort signal. The strict Zod result has `status`, an application-owned `reasonCode`, and `confidence`. It intentionally excludes free-form evidence to prevent extracted medical text from propagating through the application. Unknown keys and invalid status/reason combinations are rejected as malformed.
+The provider accepts only an already validated in-memory document, the trusted category, and an abort signal. The strict Zod result has `status`, a bounded application-owned `reasonCodes` array, and `confidence`. It intentionally excludes free-form evidence to prevent extracted medical text from propagating through the application. Unknown keys, duplicates, low-confidence passes, and invalid status/reason combinations are rejected as malformed.
 
 The application owns all display wording. It supports passed, further-review, unable-to-verify, and operationally unavailable states plus the required disclaimer. An unavailable outcome is never rendered as a pass.
 
-No provider SDK or network implementation is present. `MockDocumentCheckProvider` returns deterministic synthetic results and performs no network requests.
+The OpenAI SDK is isolated to the server-only provider. `MockDocumentCheckProvider` remains the deterministic default in tests and performs no network requests.
+
+## Configuration and live-enablement gate
+
+All variables are server-only and are listed with blank/safe values in `.env.example`. The default is `DOCUMENT_CHECK_ENABLED=false` and `DOCUMENT_CHECK_PROVIDER=mock`. In production, enabling the route requires an explicit OpenAI key/model, Upstash URL/token, a 32+ character HMAC secret, and configured limits. Missing or invalid configuration returns only the unavailable public state. A production mock provider is rejected rather than silently substituting a fake pass.
+
+The route accepts only a strict `bloodwork` or `physical` category and one `file` field. It rejects arbitrary browser prompts, validates bytes before provider work, and sends no AI state into submissions, generated PDFs, email, support notifications, certification, Supabase, analytics, storage, or URLs. Every response includes `Cache-Control: no-store, no-cache, must-revalidate, private`, `Pragma: no-cache`, and `Expires: 0`.
 
 ## Remaining blockers before live integration
 
@@ -146,9 +156,8 @@ No provider SDK or network implementation is present. `MockDocumentCheckProvider
 2. Select the provider and document its data flow, regions, subprocessors, security controls, retention defaults, training policy, abuse-monitoring retention, deletion behavior, and incident terms.
 3. Obtain legal/privacy review on whether a BAA or a contractually enforced zero-data-retention arrangement is required for medical/identity data. Do not claim the provider stores nothing until both contract and technical settings confirm it.
 4. Decide direct-PDF versus bounded in-memory rendering based on provider capability and test both pages. Add pixel/decompression-bomb limits if rendering is used.
-5. Implement and security-review `app/api/document-check/route.ts` with no-store headers, dynamic execution, single-file parsing, durable rate limiting, timeouts, fixed errors, and no submission coupling.
-6. Add the manual UI with cancellation on unmount/navigation, accessible status announcements, late-result suppression, and the mandatory disclaimer.
-7. Add deployment tests for Vercel request rejection behavior and provider timeouts. Confirm environment variables are server-only and none use a `NEXT_PUBLIC_` prefix.
+5. Security-review the implemented route, provider boundary, and public UI in the target Vercel deployment.
+6. Add deployment tests for Vercel request rejection behavior and provider timeouts. Confirm environment variables are server-only and none use a `NEXT_PUBLIC_` prefix.
 
 ## Proposed future files
 
@@ -163,12 +172,13 @@ Existing preparation:
 - `lib/document-check/requestCoordinator.ts`
 - `lib/document-check/rateLimit.ts`
 
-Future implementation:
+Implemented implementation boundary:
 
 - `app/api/document-check/route.ts`
-- `lib/document-check/providers/<selected-provider>.server.ts`
-- `lib/document-check/rateLimit/<durable-backend>.server.ts`
-- `components/document-check/DocumentCheck.tsx`
+- `lib/document-check/openaiProvider.ts`
+- `lib/document-check/upstashRateLimiter.ts`
+- `lib/document-check/config.ts`
+- `components/StepUploads.tsx`
 
 ## Privacy claims that must not be made yet
 

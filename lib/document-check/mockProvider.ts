@@ -10,12 +10,12 @@ export class MockDocumentCheckProvider implements DocumentCheckProvider {
     if (this.scenario === "timeout") return waitUntilAborted(signal);
     if (this.scenario === "malformed") return { status: "pass", confidence: "certain" };
     if (this.scenario === "review") {
-      return { status: "review", reasonCode: "POSSIBLE_NP_OR_PA", confidence: "medium" };
+      return { status: "review", reasonCodes: ["POSSIBLE_NP_OR_PA"], confidence: "medium" };
     }
     if (this.scenario === "unable") {
-      return { status: "unable_to_verify", reasonCode: "IMAGE_UNREADABLE", confidence: "low" };
+      return { status: "unable_to_verify", reasonCodes: ["DOCUMENT_UNREADABLE"], confidence: "low" };
     }
-    return { status: "pass", reasonCode: "NO_OBVIOUS_ISSUE", confidence: "high" };
+    return { status: "pass", reasonCodes: ["NO_OBVIOUS_ISSUE"], confidence: "high" };
   }
 }
 

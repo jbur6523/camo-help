@@ -1,8 +1,11 @@
 import { documentCheckResultSchema, type DocumentCheckResult } from "@/lib/document-check/schema";
 import type { ValidatedDocument } from "@/lib/files/serverDocumentValidation";
 
+export type DocumentCheckCategory = "bloodwork" | "physical";
+export type DocumentCheckInput = { document: ValidatedDocument; category: DocumentCheckCategory };
+
 export type DocumentCheckProvider = {
-  check(document: ValidatedDocument, signal: AbortSignal): Promise<unknown>;
+  check(input: DocumentCheckInput, signal: AbortSignal): Promise<unknown>;
 };
 
 export type DocumentCheckUnavailableReason =
@@ -23,11 +26,13 @@ export type DocumentCheckOutcome =
 export async function runDocumentCheck({
   provider,
   document,
+  category,
   timeoutMs,
   signal
 }: {
   provider: DocumentCheckProvider;
   document: ValidatedDocument;
+  category?: DocumentCheckCategory;
   timeoutMs: number;
   signal?: AbortSignal;
 }): Promise<DocumentCheckOutcome> {
@@ -45,7 +50,7 @@ export async function runDocumentCheck({
   else signal?.addEventListener("abort", cancel, { once: true });
 
   try {
-    const rawResult = await Promise.race([provider.check(document, controller.signal), aborted]);
+    const rawResult = await Promise.race([provider.check({ document, category: category || "bloodwork" }, controller.signal), aborted]);
     const parsed = documentCheckResultSchema.safeParse(rawResult);
     if (!parsed.success) return { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_RESPONSE" };
     return { kind: "result", result: parsed.data };

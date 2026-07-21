@@ -32,12 +32,18 @@ export class MemoryDocumentCheckRateLimiter implements DocumentCheckRateLimiter 
     const leaseId = `test-lease-${this.nextLease++}`;
     this.bursts.set(client, [...recent, request.now]);
     this.daily.set(dayKey, (this.daily.get(dayKey) || 0) + 1);
-    this.monthlyUsage += 1;
     this.leases.set(leaseId, client);
     return { allowed: true, leaseId };
   }
 
   async release(leaseId: string) {
     this.leases.delete(leaseId);
+  }
+
+  async consumeProviderBudget(leaseId: string): Promise<DocumentCheckRateLimitDecision> {
+    if (!this.leases.has(leaseId)) return { allowed: false, reasonCode: "BACKEND_UNAVAILABLE" };
+    if (this.monthlyUsage >= this.limits.monthly) return { allowed: false, reasonCode: "MONTHLY_USAGE_LIMIT" };
+    this.monthlyUsage += 1;
+    return { allowed: true, leaseId };
   }
 }

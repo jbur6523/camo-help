@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { getDocumentCheckConfig } from "@/lib/document-check/config";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export function GET() {
   const betaMode = process.env.BETA_MODE !== "false";
@@ -13,6 +15,7 @@ export function GET() {
 
   return NextResponse.json({
     betaMode,
-    emailConfigured
+    emailConfigured,
+    documentCheckEnabled: getDocumentCheckConfig().enabled
   });
 }

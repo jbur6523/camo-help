@@ -90,6 +90,7 @@ type GeneratedPdfs = {
 type ConfigStatus = {
   betaMode: boolean;
   emailConfigured: boolean;
+  documentCheckEnabled: boolean;
 };
 
 type SubmissionFailure = {
@@ -286,7 +287,7 @@ export function ApplicationWizard() {
         {step === "commissionHistory" ? <StepCommissionHistory form={form} /> : null}
         {step === "legal" ? <StepLegalQuestions form={form} /> : null}
         {step === "uploads" ? (
-          <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} />
+          <StepUploads form={form} uploadFiles={uploadFiles} onFilesAdd={handleFilesAdd} onFileRemove={handleFileRemove} documentCheckEnabled={Boolean(configStatus?.documentCheckEnabled)} />
         ) : null}
         {step === "review" ? <StepReview form={form} uploadFiles={uploadFiles} documentsOnly={documentsOnly} onEdit={setStep} /> : null}
         {step === "generate" ? (

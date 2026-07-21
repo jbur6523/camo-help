@@ -18,6 +18,7 @@ export type DocumentCheckRateLimitRequest = {
 
 export interface DocumentCheckRateLimiter {
   acquire(request: DocumentCheckRateLimitRequest): Promise<DocumentCheckRateLimitDecision>;
+  consumeProviderBudget(leaseId: string): Promise<DocumentCheckRateLimitDecision>;
   release(leaseId: string): Promise<void>;
 }
 
