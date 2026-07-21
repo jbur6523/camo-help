@@ -13,6 +13,12 @@ export function createSubmissionReferenceId(date = new Date()) {
   return `SUB-${year}${month}${day}-${randomSuffix()}`;
 }
 
+export function normalizeSubmissionReferenceId(value: unknown) {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().toUpperCase();
+  return /^SUB-\d{8}-[A-Z0-9]{6}$/.test(normalized) ? normalized : "";
+}
+
 function randomSuffix() {
   if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
     const bytes = new Uint8Array(4);

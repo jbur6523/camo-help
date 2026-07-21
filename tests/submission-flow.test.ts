@@ -207,7 +207,7 @@ test("submission failures return and log safe metadata without exposing file dat
     const loggedText = JSON.stringify(logs);
 
     assert.equal(response.status, 400);
-    assert.match(responseText, /We were unable to submit your documents at this time/);
+    assert.match(responseText, /This file could not be processed safely/);
     assert.doesNotMatch(loggedText, /Blood Work|medical-file|base64-like/);
     for (const sensitiveValue of [secretFilename, secretFileContents, secretName, secretEmail]) {
       assert.doesNotMatch(responseText, new RegExp(sensitiveValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

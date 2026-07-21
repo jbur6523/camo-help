@@ -29,8 +29,9 @@ export function isAdminSessionCookieValid(value: string | undefined) {
   return safeEqual(signature, sign(payload));
 }
 
-export function isAdminPageAuthenticated() {
-  return isAdminSessionCookieValid(cookies().get(adminSessionCookieName)?.value);
+export async function isAdminPageAuthenticated() {
+  const cookieStore = await cookies();
+  return isAdminSessionCookieValid(cookieStore.get(adminSessionCookieName)?.value);
 }
 
 export function isAdminRequestAuthenticated(request: NextRequest) {

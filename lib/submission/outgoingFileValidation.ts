@@ -1,8 +1,10 @@
+import { submissionPerFileLimitBytes } from "@/lib/files/documentPolicies";
+
 type OutgoingFileSummary = {
   size: number;
 };
 
-export const maxSingleOutgoingFileBytes = 4 * 1024 * 1024;
+export const maxSingleOutgoingFileBytes = submissionPerFileLimitBytes;
 
 export function submissionSizeProblem(files: OutgoingFileSummary[]) {
   return files.some((file) => file.size > maxSingleOutgoingFileBytes) ? fileTooLargeMessage() : "";

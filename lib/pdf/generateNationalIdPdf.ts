@@ -17,8 +17,8 @@ function getSignatureDataUrl(data: ApplicationData) {
     (data as unknown as { signatureDataUrl?: string; drawnSignatureDataUrl?: string }).drawnSignatureDataUrl;
 }
 
-function warnInDevelopment(message: string) {
+function warnInDevelopment(_message: string) {
   if (process.env.NODE_ENV !== "production") {
-    console.warn(`[National ID PDF] ${message}`);
+    console.warn("National ID PDF field operation skipped.", { reasonCode: "PDF_FIELD_OPERATION_SKIPPED" });
   }
 }

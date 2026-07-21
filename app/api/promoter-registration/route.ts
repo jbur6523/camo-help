@@ -5,6 +5,11 @@ import {
 } from "@/lib/email/supportNotifications";
 import { promoterRegistrationSchema, type PromoterRegistration } from "@/lib/promoters/registrationSchema";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import {
+  DocumentValidationError,
+  safeDocumentValidationMessage,
+  validateUploadedDocument
+} from "@/lib/files/serverDocumentValidation";
 
 export const runtime = "nodejs";
 
@@ -38,7 +43,17 @@ export async function POST(request: Request) {
     websiteUrl: formValue(formData, "websiteUrl")
   };
   const parsed = promoterRegistrationSchema.safeParse(body);
-  const governmentId = await attachmentFromForm(formData, "governmentId");
+  let governmentId: EmailAttachment | undefined;
+  try {
+    governmentId = await attachmentFromForm(formData, "governmentId");
+  } catch (error) {
+    const reasonCode = error instanceof DocumentValidationError ? error.reasonCode : "UPLOAD_PROCESSING_FAILED";
+    console.warn("Promoter registration upload validation rejected.", { reasonCode });
+    return NextResponse.json(
+      { error: safeDocumentValidationMessage, fieldErrors: { governmentId: [safeDocumentValidationMessage] } },
+      { status: 400 }
+    );
+  }
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -57,16 +72,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!isAllowedGovernmentIdAttachment(governmentId)) {
-    return NextResponse.json(
-      {
-        error: "Driver License / Government-Issued ID must be an image or PDF.",
-        fieldErrors: { governmentId: ["Driver License / Government-Issued ID must be an image or PDF."] }
-      },
-      { status: 400 }
-    );
-  }
-
   try {
     const registration = parsed.data;
     const supabase = createSupabaseServiceRoleClient();
@@ -104,7 +109,7 @@ export async function POST(request: Request) {
       promotionName: body.promotionName,
       userShownOutcome: "failure"
     });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Promoter registration could not be completed at this time." }, { status: 500 });
   }
 }
 
@@ -115,18 +120,18 @@ function formValue(formData: FormData, key: string) {
 
 async function attachmentFromForm(formData: FormData, key: string) {
   const file = formData.get(key);
-  if (!(file instanceof File) || file.size === 0) return undefined;
+  if (!(file instanceof File)) return undefined;
+  const filename = file.name || key;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const validated = await validateUploadedDocument(
+    { bytes, declaredMimeType: file.type || "application/octet-stream", filename },
+    "submission"
+  );
   return {
-    filename: file.name || key,
-    content: Buffer.from(await file.arrayBuffer()),
-    contentType: file.type || "application/octet-stream"
+    filename,
+    content: Buffer.from(validated.bytes),
+    contentType: validated.mimeType
   };
-}
-
-function isAllowedGovernmentIdAttachment(attachment: EmailAttachment) {
-  const contentType = attachment.contentType || "";
-  const filename = attachment.filename.toLowerCase();
-  return contentType.startsWith("image/") || contentType === "application/pdf" || /\.(pdf|jpe?g|png|heic|heif|webp)$/i.test(filename);
 }
 
 async function sendPromoterPendingVerificationEmail(registration: PromoterRegistration) {
@@ -164,7 +169,7 @@ async function sendPromoterPendingVerificationEmail(registration: PromoterRegist
     });
 
     if (error) {
-      console.error(`Promoter registration confirmation email failed: ${error.message}`);
+      console.error("Promoter registration confirmation email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
         source: "sendPromoterPendingVerificationEmail",
@@ -174,7 +179,7 @@ async function sendPromoterPendingVerificationEmail(registration: PromoterRegist
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
-    console.error(`Promoter registration confirmation email failed: ${message}`);
+    console.error("Promoter registration confirmation email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
     await sendSupportErrorNotification({
       errorType: "Email Sending Failure",
       source: "sendPromoterPendingVerificationEmail",

@@ -28,8 +28,8 @@ function getSignatureDataUrl(data: ApplicationData) {
     (data as unknown as { signatureDataUrl?: string; drawnSignatureDataUrl?: string }).drawnSignatureDataUrl;
 }
 
-function warnInDevelopment(message: string) {
+function warnInDevelopment(_message: string) {
   if (process.env.NODE_ENV !== "production") {
-    console.warn(`[Athlete License PDF] ${message}`);
+    console.warn("Athlete License PDF field operation skipped.", { reasonCode: "PDF_FIELD_OPERATION_SKIPPED" });
   }
 }

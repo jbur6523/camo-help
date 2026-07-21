@@ -9,7 +9,6 @@ import {
 } from "@/lib/email/sendApplicationEmails";
 import { generateSignatureCertificatePdf } from "@/lib/pdf/generateSignatureCertificatePdf";
 import {
-  safeErrorMessage,
   sendSupportErrorNotification,
   sendSupportFighterSubmissionNotification
 } from "@/lib/email/supportNotifications";
@@ -18,12 +17,16 @@ import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
 import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
-import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
+import { createSubmissionReferenceId, normalizeSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApproximateIpLocation } from "@/lib/signatureAudit";
 import type { ApplicationData, UploadKey } from "@/lib/types";
-import { fullName } from "@/lib/types";
 import { independentPromoterId } from "@/lib/promoters/constants";
+import {
+  DocumentValidationError,
+  safeDocumentValidationMessage,
+  validateUploadedDocument
+} from "@/lib/files/serverDocumentValidation";
 
 export const runtime = "nodejs";
 
@@ -41,7 +44,6 @@ type DeliveryState = {
 
 export async function POST(request: Request) {
   let submissionId = "unknown";
-  let applicationForError: ApplicationData | null = null;
   const deliveryState: DeliveryState = {
     completedStep: "request_received",
     applicationEmailSent: false,
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const submittedId = formData.get("submissionId");
-    submissionId = typeof submittedId === "string" && submittedId.trim() ? submittedId.trim() : createSubmissionReferenceId();
+    submissionId = normalizeSubmissionReferenceId(submittedId) || createSubmissionReferenceId();
     pruneProcessedSubmissionIds();
     console.info("API submission request received.", { submissionId });
 
@@ -69,23 +71,29 @@ export async function POST(request: Request) {
     }
 
     const application = JSON.parse(applicationJson) as ApplicationData;
-    applicationForError = application;
     deliveryState.completedStep = "application_payload_parsed";
     const ipAddress = clientIpFromHeaders(request.headers);
     const approximateIpLocation = approximateIpLocationFromHeaders(request.headers);
-    const submittedAthletePdf = await attachmentFromForm(formData, "athletePdf", "completed-athlete-license.pdf");
-    const submittedNationalIdPdf = await attachmentFromForm(formData, "nationalIdPdf", "completed-national-mma-id.pdf");
     const requirementsNeeded = application.requirementsNeeded || [];
+    const submittedAthleteFile = fileFromForm(formData, "athletePdf");
+    const submittedNationalIdFile = fileFromForm(formData, "nationalIdPdf");
 
-    if (requirementsNeeded.includes("athleteLicenseApplication") && !submittedAthletePdf) {
+    if (requirementsNeeded.includes("athleteLicenseApplication") && !submittedAthleteFile) {
       return NextResponse.json({ error: "Completed Athlete License PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
-    if (requirementsNeeded.includes("nationalMmaIdApplication") && !submittedNationalIdPdf) {
+    if (requirementsNeeded.includes("nationalMmaIdApplication") && !submittedNationalIdFile) {
       return NextResponse.json({ error: "Completed National MMA ID PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
-    const parsedUploads: Record<UploadKey, Awaited<ReturnType<typeof attachmentsFromForm>>> = {
+    if (requirementsNeeded.includes("athleteLicenseApplication") && submittedAthleteFile) {
+      await attachmentFromFile(submittedAthleteFile, "completed-athlete-license.pdf");
+    }
+    if (requirementsNeeded.includes("nationalMmaIdApplication") && submittedNationalIdFile) {
+      await attachmentFromFile(submittedNationalIdFile, "completed-national-mma-id.pdf");
+    }
+
+    const parsedUploadFiles: Record<UploadKey, File[]> = {
       bloodwork: [],
       physical: [],
       headshot: [],
@@ -94,9 +102,13 @@ export async function POST(request: Request) {
       additional: []
     };
     for (const key of uploadKeys) {
-      parsedUploads[key] = await attachmentsFromForm(formData, key);
+      parsedUploadFiles[key] = filesFromForm(formData, key);
     }
-    const uploads = filterSelectedUploads(requirementsNeeded, parsedUploads);
+    const selectedUploadFiles = filterSelectedUploads(requirementsNeeded, parsedUploadFiles);
+    const uploads: Partial<Record<UploadKey, Awaited<ReturnType<typeof attachmentsFromFiles>>>> = {};
+    for (const [key, files] of Object.entries(selectedUploadFiles) as Array<[UploadKey, File[]]>) {
+      uploads[key] = await attachmentsFromFiles(files, key);
+    }
     deliveryState.completedStep = "attachments_parsed";
 
     assertRequiredUploadsPresent(application, uploads);
@@ -107,7 +119,6 @@ export async function POST(request: Request) {
       ...application,
       signatureDate: formatPacificDate(submittedAt)
     };
-    applicationForError = applicationWithSubmissionDate;
     const athletePdf = requirementsNeeded.includes("athleteLicenseApplication")
       ? await serverGeneratedOfficialPdf("athlete", applicationWithSubmissionDate)
       : undefined;
@@ -161,11 +172,10 @@ export async function POST(request: Request) {
         fighterConfirmationEmailSent: Boolean(result.fighterConfirmationRecipient),
         promoterNotificationStatus: promoterNotificationStatusBeforeSend(application)
       });
-    } catch (supportError) {
-      const supportMessage = supportError instanceof Error ? supportError.message : "Support notification failed.";
+    } catch {
       console.warn("Support fighter submission notification failed without blocking submission.", {
         submissionId,
-        error: safeErrorMessage(supportMessage)
+        reasonCode: "SUPPORT_NOTIFICATION_FAILED"
       });
     }
 
@@ -174,6 +184,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient, deliveryState });
   } catch (error) {
+    if (error instanceof DocumentValidationError) {
+      processedSubmissionIds.delete(submissionId);
+      console.warn("API submission upload validation rejected.", { reasonCode: error.reasonCode });
+      return NextResponse.json({ error: safeDocumentValidationMessage, submissionId, deliveryState }, { status: 400 });
+    }
     const message = error instanceof Error ? error.message : "Submission failed.";
     const errorType = classifySubmissionError(message, error);
     const isPartial = error instanceof SubmissionEmailDeliveryError && error.sentKinds.length > 0;
@@ -190,8 +205,6 @@ export async function POST(request: Request) {
       operation: "Complete fighter document submission",
       details: deliveryStateDetails(deliveryState),
       submissionId,
-      fighterName: applicationForError ? fullName(applicationForError) : undefined,
-      fighterEmail: applicationForError?.email,
       userShownOutcome: isPartial ? "partial" : "failure"
     });
     return NextResponse.json(
@@ -208,25 +221,31 @@ export async function POST(request: Request) {
   }
 }
 
-async function attachmentFromForm(formData: FormData, key: string, fallbackName?: string) {
+function fileFromForm(formData: FormData, key: string) {
   const file = formData.get(key);
-  if (!(file instanceof File) || file.size === 0) return undefined;
+  return file instanceof File ? file : undefined;
+}
+
+async function attachmentFromFile(file: File, fallbackName?: string) {
+  const filename = file.name || fallbackName || "upload";
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const validated = await validateUploadedDocument(
+    { bytes, declaredMimeType: file.type || "application/octet-stream", filename },
+    "submission"
+  );
   return {
-    filename: file.name || fallbackName || key,
-    content: Buffer.from(await file.arrayBuffer()),
-    contentType: file.type || "application/octet-stream"
+    filename,
+    content: Buffer.from(validated.bytes),
+    contentType: validated.mimeType
   };
 }
 
-async function attachmentsFromForm(formData: FormData, key: string) {
-  const files = formData.getAll(key).filter((file): file is File => file instanceof File && file.size > 0);
-  return Promise.all(
-    files.map(async (file) => ({
-      filename: file.name || key,
-      content: Buffer.from(await file.arrayBuffer()),
-      contentType: file.type || "application/octet-stream"
-    }))
-  );
+function filesFromForm(formData: FormData, key: string) {
+  return formData.getAll(key).filter((file): file is File => file instanceof File);
+}
+
+async function attachmentsFromFiles(files: File[], fallbackName: string) {
+  return Promise.all(files.map((file) => attachmentFromFile(file, fallbackName)));
 }
 
 function pruneProcessedSubmissionIds() {

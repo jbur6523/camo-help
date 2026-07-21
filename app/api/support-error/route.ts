@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendSupportErrorNotification, safeErrorMessage } from "@/lib/email/supportNotifications";
+import { normalizeSubmissionReferenceId } from "@/lib/submission/referenceId";
 
 export const runtime = "nodejs";
 
@@ -10,8 +11,6 @@ type ClientSupportErrorPayload = {
   message?: string;
   operation?: string;
   details?: string[];
-  fighterName?: string;
-  fighterEmail?: string;
   userShownOutcome?: "none" | "failure" | "partial";
 };
 
@@ -25,13 +24,11 @@ export async function POST(request: Request) {
 
   await sendSupportErrorNotification({
     errorType: payload.errorType || "Client Submission Failure",
-    source: payload.source || "client",
+    source: "app/api/support-error POST",
     message: safeErrorMessage(payload.message || "Client-side submission error."),
     operation: payload.operation || "Complete client-side submission step",
     details: Array.isArray(payload.details) ? payload.details.slice(0, 30) : undefined,
-    submissionId: payload.submissionId,
-    fighterName: payload.fighterName,
-    fighterEmail: payload.fighterEmail,
+    submissionId: normalizeSubmissionReferenceId(payload.submissionId) || undefined,
     userShownOutcome: payload.userShownOutcome || "failure"
   });
 

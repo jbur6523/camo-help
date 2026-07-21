@@ -81,7 +81,7 @@ Payment remains outside this app. Document submission still works normally witho
 
 ## Upload Privacy
 
-Typed form progress is saved in browser local storage. Uploaded files are kept in memory for the active session and sent during submission; they are not committed to the repo and are not intentionally stored long term.
+Typed form progress is saved in browser local storage for up to 24 hours after the last update. Uploaded files, filenames, last-four SSN digits, signatures, and certification state are not included in that browser draft. Uploaded files are kept in memory for the active page session and sent to the intended recipients during submission.
 
 ## Deploy To Vercel
 

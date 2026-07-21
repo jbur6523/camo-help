@@ -116,7 +116,7 @@ export async function sendSupportNotification({ subject, text, html, source, sub
         source,
         submissionId: submissionId || "not available",
         timestamp: new Date().toISOString(),
-        error: safeErrorMessage(error.message)
+        reasonCode: "EMAIL_PROVIDER_FAILURE"
       });
       return null;
     }
@@ -134,7 +134,7 @@ export async function sendSupportNotification({ subject, text, html, source, sub
       source,
       submissionId: submissionId || "not available",
       timestamp: new Date().toISOString(),
-      error: safeErrorMessage(message)
+      reasonCode: "SUPPORT_NOTIFICATION_FAILED"
     });
     return null;
   }

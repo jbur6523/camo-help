@@ -6,6 +6,6 @@ export const metadata = {
   title: "Admin Promoters | CAMO Fighter Application Helper"
 };
 
-export default function AdminPromotersPage() {
-  return isAdminPageAuthenticated() ? <AdminPromotersDashboard /> : <AdminLoginForm />;
+export default async function AdminPromotersPage() {
+  return (await isAdminPageAuthenticated()) ? <AdminPromotersDashboard /> : <AdminLoginForm />;
 }

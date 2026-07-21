@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
-import { safeErrorMessage, sendSupportErrorNotification } from "@/lib/email/supportNotifications";
+import { sendSupportErrorNotification } from "@/lib/email/supportNotifications";
 import { independentPromoterId } from "@/lib/promoters/constants";
 import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
 import type { ApplicationData } from "@/lib/types";
@@ -105,7 +105,7 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
         submissionId,
         kind: message.kind,
         timestamp: new Date().toISOString(),
-        error: safeErrorMessage(errorMessage)
+        reasonCode: "EMAIL_PROVIDER_FAILURE"
       });
       throw new SubmissionEmailDeliveryError({
         failedKind: message.kind,
@@ -258,7 +258,7 @@ export async function sendPromoterNotificationEmail(application: ApplicationData
       console.warn("Promoter notification skipped.", {
         submissionId,
         timestamp: new Date().toISOString(),
-        error: safeErrorMessage(error.message)
+        reasonCode: "PROMOTER_LOOKUP_FAILED"
       });
       await sendSupportErrorNotification({
         errorType: "Supabase Promoter Fetch Failure",
@@ -294,7 +294,7 @@ export async function sendPromoterNotificationEmail(application: ApplicationData
       console.warn("Promoter notification email failed.", {
         submissionId,
         timestamp: new Date().toISOString(),
-        error: safeErrorMessage(emailError.message)
+        reasonCode: "EMAIL_PROVIDER_FAILURE"
       });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
@@ -317,7 +317,7 @@ export async function sendPromoterNotificationEmail(application: ApplicationData
     console.warn("Promoter notification skipped.", {
       submissionId,
       timestamp: new Date().toISOString(),
-      error: safeErrorMessage(message)
+      reasonCode: "PROMOTER_NOTIFICATION_FAILED"
     });
     await sendSupportErrorNotification({
       errorType: "Promoter Notification Failure",
@@ -359,7 +359,7 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
       console.warn("Fighter confirmation email failed.", {
         submissionId,
         timestamp: new Date().toISOString(),
-        error: safeErrorMessage(error.message)
+        reasonCode: "EMAIL_PROVIDER_FAILURE"
       });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
@@ -382,7 +382,7 @@ async function sendFighterConfirmationEmail(resend: Resend, from: string, applic
     console.warn("Fighter confirmation email failed.", {
       submissionId,
       timestamp: new Date().toISOString(),
-      error: safeErrorMessage(message)
+      reasonCode: "FIGHTER_CONFIRMATION_FAILED"
     });
     await sendSupportErrorNotification({
       errorType: "Email Sending Failure",

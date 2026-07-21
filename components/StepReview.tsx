@@ -157,9 +157,9 @@ export function StepReview({
         </div>
 
         <div className="notice">
-          <strong>Privacy notice:</strong> This app will send your application documents to the intended recipients. Do not submit
-          unless you are ready to share documents for application processing. No record of documents or personal data is stored by
-          camo-help.com.
+          <strong>Privacy notice:</strong> This app temporarily saves your typed draft in this browser for up to 24 hours so you can
+          recover your progress. Uploaded files, filenames, Social Security number digits, and signatures are not saved in the browser
+          draft. When you submit, application documents are sent to the intended recipients for processing.
         </div>
 
         {needsAthleteLicenseWaiver ? (

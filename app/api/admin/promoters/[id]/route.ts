@@ -11,7 +11,7 @@ import type { PromoterStatus } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAdminRequestAuthenticated(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -34,11 +34,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   let promoterForError: { email: string; promotion_name: string; contact_name: string } | null = null;
   try {
+    const { id } = await params;
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error: fetchError } = await supabase
       .from("promoters")
       .select("id, status, email, promotion_name, contact_name")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle();
 
     if (fetchError) throw new Error(`Supabase promoter fetch failure: ${fetchError.message}`);
@@ -55,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .update({
         status: nextStatus
       })
-      .eq("id", params.id);
+      .eq("id", id);
 
     if (updateError) throw new Error(`Supabase promoter status update failure: ${updateError.message}`);
 
@@ -103,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       promotionName: promoterForError?.promotion_name,
       userShownOutcome: "failure"
     });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "The promoter status could not be updated at this time." }, { status: 500 });
   }
 }
 
@@ -149,7 +150,7 @@ async function sendPromoterDenialEmail({
     });
 
     if (error) {
-      console.error(`Promoter denial email failed: ${error.message}`);
+      console.error("Promoter denial email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
         source: "sendPromoterDenialEmail",
@@ -163,7 +164,7 @@ async function sendPromoterDenialEmail({
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
-    console.error(`Promoter denial email failed: ${message}`);
+    console.error("Promoter denial email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
     await sendSupportErrorNotification({
       errorType: "Email Sending Failure",
       source: "sendPromoterDenialEmail",
@@ -213,7 +214,7 @@ async function sendPromoterApprovalEmail({
     });
 
     if (error) {
-      console.error(`Promoter approval email failed: ${error.message}`);
+      console.error("Promoter approval email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
       await sendSupportErrorNotification({
         errorType: "Email Sending Failure",
         source: "sendPromoterApprovalEmail",
@@ -223,7 +224,7 @@ async function sendPromoterApprovalEmail({
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
-    console.error(`Promoter approval email failed: ${message}`);
+    console.error("Promoter approval email failed.", { reasonCode: "EMAIL_PROVIDER_FAILURE" });
     await sendSupportErrorNotification({
       errorType: "Email Sending Failure",
       source: "sendPromoterApprovalEmail",

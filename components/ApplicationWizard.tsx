@@ -28,7 +28,6 @@ import {
   defaultApplicationData,
   fightRecordTotal,
   formatBirthDateInput,
-  fullName,
   paymentTotal,
   uploadLabels,
   type ApplicationData,
@@ -36,8 +35,12 @@ import {
   type UploadedFiles
 } from "@/lib/types";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
-
-const storageKey = "camo-help-application-v1";
+import {
+  clearApplicationDraft,
+  loadApplicationDraft,
+  removeExpiredApplicationDraft,
+  saveApplicationDraft
+} from "@/lib/draftStorage";
 
 type StepId =
   | "requirements"
@@ -96,8 +99,6 @@ type SubmissionFailure = {
 };
 
 type SubmissionFileSummary = {
-  field: string;
-  filename: string;
   size: number;
 };
 
@@ -118,7 +119,6 @@ type SubmissionDeliveryState = {
   supportNotificationAttempted?: boolean;
 };
 
-const safeResponsePreviewLength = 180;
 type ImageCompressionConfig = {
   maxDimension: number;
   quality: number;
@@ -163,10 +163,8 @@ export function ApplicationWizard() {
   const activeStepIndex = Math.max(activeSteps.indexOf(step), 0);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      reset({ ...defaultApplicationData, ...JSON.parse(saved) });
-    }
+    const saved = loadApplicationDraft(window.localStorage);
+    if (saved) reset(saved);
   }, [reset]);
 
   useEffect(() => {
@@ -178,10 +176,15 @@ export function ApplicationWizard() {
 
   useEffect(() => {
     const subscription = watch((value) => {
-      window.localStorage.setItem(storageKey, JSON.stringify(value));
+      saveApplicationDraft(window.localStorage, value);
     });
     return () => subscription.unsubscribe();
   }, [watch]);
+
+  useEffect(() => {
+    const expiryCheck = window.setInterval(() => removeExpiredApplicationDraft(window.localStorage), 60_000);
+    return () => window.clearInterval(expiryCheck);
+  }, []);
 
   useEffect(() => {
     const formattedBirthDate = formatBirthDateInput(data.birthDate);
@@ -327,7 +330,6 @@ export function ApplicationWizard() {
     }
     setUploadFiles((current) => {
       const nextFiles = options?.replace ? preparedFiles : [...(current[key] || []), ...preparedFiles];
-      setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
       return { ...current, [key]: nextFiles };
     });
   }
@@ -335,7 +337,6 @@ export function ApplicationWizard() {
   function handleFileRemove(key: UploadKey, index: number) {
     setUploadFiles((current) => {
       const nextFiles = (current[key] || []).filter((_, fileIndex) => fileIndex !== index);
-      setValue(`uploads.${key}` as any, nextFiles.map((file) => file.name).join(", "), { shouldDirty: true });
       return { ...current, [key]: nextFiles };
     });
     setGlobalError("");
@@ -530,19 +531,16 @@ export function ApplicationWizard() {
         nationalIdPdfGenerated: Boolean(nationalBlob)
       });
       return generated;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not generate PDFs.";
-      console.error("PDF generation failed.", { submissionId: submissionId || "not assigned", error: message });
+    } catch {
+      console.error("PDF generation failed.", { submissionId: submissionId || "not assigned", reasonCode: "PDF_GENERATION_FAILED" });
       if (submissionId) {
         await notifyClientSupportError({
           submissionId,
           errorType: "PDF Generation Failure",
           source: "components/ApplicationWizard.generatePdfs",
-          message,
+          message: "PDF generation failed.",
           operation: "Generate selected application PDFs",
-          userShownOutcome: "failure",
-          fighterName: fullName(form.getValues()),
-          fighterEmail: form.getValues("email")
+          userShownOutcome: "failure"
         });
       }
       setGlobalError("We were unable to generate your forms at this time.");
@@ -638,18 +636,15 @@ export function ApplicationWizard() {
             submissionId,
             errorType: largeUploadRejection ? "Upload Request Too Large" : "Non-JSON Submission Response",
             source: "components/ApplicationWizard.submitDocuments",
-            message: parsedResponse.text || `Non-JSON response returned with HTTP ${response.status}.`,
+            message: "The submission endpoint returned an unexpected response.",
             operation: "Submit documents from browser",
             details: buildClientSubmissionErrorDetails({
               status: response.status,
               contentType: parsedResponse.contentType,
-              responsePreview: parsedResponse.text,
               files: outgoingFiles,
               deliveryState: result.deliveryState
             }),
-            userShownOutcome: "failure",
-            fighterName: fullName(form.getValues()),
-            fighterEmail: form.getValues("email")
+            userShownOutcome: "failure"
           });
         }
         setSubmissionFailure({
@@ -664,39 +659,33 @@ export function ApplicationWizard() {
           submissionId,
           errorType: "Unexpected Submission Response",
           source: "components/ApplicationWizard.submitDocuments",
-          message: parsedResponse.text || "Submission succeeded but returned a non-JSON response.",
+          message: "The submission endpoint returned an unexpected response.",
           operation: "Read submit documents response",
           details: buildClientSubmissionErrorDetails({
             status: response.status,
             contentType: parsedResponse.contentType,
-            responsePreview: parsedResponse.text,
             files: outgoingFiles,
             deliveryState: result.deliveryState
           }),
-          userShownOutcome: "failure",
-          fighterName: fullName(form.getValues()),
-          fighterEmail: form.getValues("email")
+          userShownOutcome: "failure"
         });
         setSubmissionFailure({ kind: "failed", submissionId, reason: "unexpected-response" });
         return;
       }
-      window.localStorage.removeItem(storageKey);
+      clearApplicationDraft(window.localStorage);
       setSubmittedEmail(values.email);
       setSubmittedSubmissionId(result.submissionId || submissionId);
       setFighterConfirmationEmailSent(Boolean(result.fighterConfirmationRecipient));
       setSubmitted(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Submission failed.";
-      console.error("Frontend submission failed.", { submissionId, error: message });
+    } catch {
+      console.error("Frontend submission failed.", { submissionId, reasonCode: "SUBMISSION_REQUEST_FAILED" });
       void notifyClientSupportError({
         submissionId,
         errorType: "Client Submission Failure",
         source: "components/ApplicationWizard.submitDocuments",
-        message,
+        message: "The submission request failed.",
         operation: "Submit documents from browser",
         userShownOutcome: "failure",
-        fighterName: fullName(form.getValues()),
-        fighterEmail: form.getValues("email")
       });
       setSubmissionFailure({ kind: "failed", submissionId });
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -986,23 +975,17 @@ function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: U
   const files: SubmissionFileSummary[] = [];
   if (generated.athleteBlob) {
     files.push({
-      field: "Athlete License PDF",
-      filename: "completed-athlete-license.pdf",
       size: generated.athleteBlob.size
     });
   }
   if (generated.nationalBlob) {
     files.push({
-      field: "National MMA ID PDF",
-      filename: "completed-national-mma-id.pdf",
       size: generated.nationalBlob.size
     });
   }
   (Object.entries(uploadFiles) as Array<[UploadKey, File[] | undefined]>).forEach(([key, uploadFilesForKey]) => {
     (uploadFilesForKey || []).forEach((file) => {
       files.push({
-        field: uploadLabels[key],
-        filename: file.name || key,
         size: file.size
       });
     });
@@ -1041,24 +1024,20 @@ function isLargeUploadRejection(status: number, responseText: string) {
 function buildClientSubmissionErrorDetails({
   status,
   contentType,
-  responsePreview,
   files,
   deliveryState
 }: {
   status?: number;
   contentType?: string;
-  responsePreview?: string;
   files: SubmissionFileSummary[];
   deliveryState?: SubmissionDeliveryState;
 }) {
   return [
     ...(typeof status === "number" ? [`HTTP status code: ${status}`] : []),
     `Content-Type response header: ${contentType || "Not available"}`,
-    `Safe response preview: ${safeResponsePreview(responsePreview || "") || "Not available"}`,
     ...submissionDeliveryStateDetails(deliveryState),
     `Outgoing file count: ${files.length}`,
-    `Outgoing total file size: ${formatBytes(totalFileBytes(files))} (${totalFileBytes(files)} bytes)`,
-    ...files.map((file) => `${file.field}: ${file.filename} - ${formatBytes(file.size)} (${file.size} bytes)`)
+    `Outgoing total file size: ${formatBytes(totalFileBytes(files))} (${totalFileBytes(files)} bytes)`
   ];
 }
 
@@ -1080,10 +1059,6 @@ function submissionDeliveryStateDetails(deliveryState?: SubmissionDeliveryState)
     `Fighter confirmation email sent: ${deliveryState.fighterConfirmationEmailSent ? "yes" : "no"}`,
     `Support notification email attempted: ${deliveryState.supportNotificationAttempted ? "yes" : "no"}`
   ];
-}
-
-function safeResponsePreview(text: string) {
-  return text.replace(/\s+/g, " ").trim().slice(0, safeResponsePreviewLength);
 }
 
 function formatBytes(bytes: number) {
@@ -1120,9 +1095,7 @@ async function notifyClientSupportError({
   message,
   operation,
   details,
-  userShownOutcome,
-  fighterName,
-  fighterEmail
+  userShownOutcome
 }: {
   submissionId: string;
   errorType: string;
@@ -1131,8 +1104,6 @@ async function notifyClientSupportError({
   operation: string;
   details?: string[];
   userShownOutcome: "none" | "failure" | "partial";
-  fighterName?: string;
-  fighterEmail?: string;
 }) {
   try {
     await fetch("/api/support-error", {
@@ -1145,9 +1116,7 @@ async function notifyClientSupportError({
         message,
         operation,
         details,
-        userShownOutcome,
-        fighterName,
-        fighterEmail
+        userShownOutcome
       })
     });
   } catch {
