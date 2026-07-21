@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { formatPacificDateTime } from "@/lib/dates";
 import { independentPromoterId } from "@/lib/promoters/constants";
+import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName, requirementLabels } from "@/lib/types";
 
@@ -52,7 +53,7 @@ type PromoterStatusChangeSupportPayload = {
   changedAt: Date;
 };
 
-type FighterSubmissionSupportPayload = {
+export type FighterSubmissionSupportPayload = {
   application: ApplicationData;
   uploads: Partial<Record<UploadKey, unknown[]>>;
   submittedAt: Date;
@@ -305,42 +306,70 @@ export async function sendSupportFighterSubmissionNotification({
   nationalIdPdfGenerated,
   applicationEmailSent,
   medicalEmailSent,
-  fighterConfirmationEmailSent
+  fighterConfirmationEmailSent,
+  promoterNotificationStatus
 }: FighterSubmissionSupportPayload) {
   const name = fullName(application);
   return sendSupportNotification({
     source: "app/api/submit-application POST",
     submissionId,
     subject: `New Fighter Submission: ${name || "Unknown Fighter"}`,
-    text: [
-      "CAMO Help Submission Received",
-      "",
-      "Submission Details",
-      "",
-      `Submission ID: ${submissionId}`,
-      `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
-      `Workflow type: ${submissionWorkflowType(application, uploads)}`,
-      "",
-      "Fighter Information",
-      "",
-      `Fighter Name: ${name || "Not provided"}`,
-      `Fighter Email: ${application.email}`,
-      `DOB: ${application.birthDate}`,
-      `Selected Promoter: ${selectedPromoterLabel(application)}`,
-      "",
-      "Submitted Items",
-      "",
-      ...fighterSubmissionTypeLines(application, uploads),
-      "",
-      "Processing Status",
-      "",
-      `Athlete License PDF generated: ${athletePdfGenerated ? "yes" : "no"}`,
-      `National MMA ID PDF generated: ${nationalIdPdfGenerated ? "yes" : "no"}`,
-      `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
-      `Medical email sent: ${medicalEmailSent ? "yes" : "no"}`,
-      `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`
-    ].join("\n")
+    text: buildSupportFighterSubmissionNotificationText({
+      application,
+      uploads,
+      submittedAt,
+      submissionId,
+      athletePdfGenerated,
+      nationalIdPdfGenerated,
+      applicationEmailSent,
+      medicalEmailSent,
+      fighterConfirmationEmailSent,
+      promoterNotificationStatus
+    })
   });
+}
+
+export function buildSupportFighterSubmissionNotificationText({
+  application,
+  uploads,
+  submittedAt,
+  submissionId,
+  athletePdfGenerated,
+  nationalIdPdfGenerated,
+  applicationEmailSent,
+  medicalEmailSent,
+  fighterConfirmationEmailSent
+}: FighterSubmissionSupportPayload) {
+  const name = fullName(application);
+  const selectedUploads = filterSelectedUploads(application.requirementsNeeded, uploads);
+  return [
+    "CAMO Help Submission Received",
+    "",
+    "Submission Details",
+    "",
+    `Submission ID: ${submissionId}`,
+    `Submitted date/time: ${formatPacificDateTime(submittedAt)}`,
+    `Workflow type: ${submissionWorkflowType(application, selectedUploads)}`,
+    "",
+    "Fighter Information",
+    "",
+    `Fighter Name: ${name || "Not provided"}`,
+    `Fighter Email: ${application.email}`,
+    `DOB: ${application.birthDate}`,
+    `Selected Promoter: ${selectedPromoterLabel(application)}`,
+    "",
+    "Submitted Items",
+    "",
+    ...fighterSubmissionTypeLines(application, selectedUploads),
+    "",
+    "Processing Status",
+    "",
+    `Athlete License PDF generated: ${athletePdfGenerated ? "yes" : "no"}`,
+    `National MMA ID PDF generated: ${nationalIdPdfGenerated ? "yes" : "no"}`,
+    `Application email sent: ${applicationEmailSent ? "yes" : "no"}`,
+    `Medical email sent: ${medicalEmailSent ? "yes" : "no"}`,
+    `Fighter confirmation email sent: ${fighterConfirmationEmailSent ? "yes" : "no"}`
+  ].join("\n");
 }
 
 function promoterStatusSubjectPrefix(oldStatus: string, newStatus: string) {

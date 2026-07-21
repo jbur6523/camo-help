@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx --test tests/submission-flow.test.ts",
     "inspect:pdfs": "tsx scripts/inspect-pdf-fields.ts",
     "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },

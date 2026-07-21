@@ -17,6 +17,7 @@ import { formatPacificDate } from "@/lib/dates";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
+import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
 import { createSubmissionReferenceId } from "@/lib/submission/referenceId";
 import { assertRequiredUploadsPresent, MissingRequiredUploadsError } from "@/lib/submission/validateRequiredUploads";
 import type { ApproximateIpLocation } from "@/lib/signatureAudit";
@@ -84,10 +85,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Completed National MMA ID PDF is missing.", submissionId, deliveryState }, { status: 400 });
     }
 
-    const uploads: Record<string, Awaited<ReturnType<typeof attachmentsFromForm>>> = {};
+    const parsedUploads: Record<UploadKey, Awaited<ReturnType<typeof attachmentsFromForm>>> = {
+      bloodwork: [],
+      physical: [],
+      headshot: [],
+      photoId: [],
+      cardio: [],
+      additional: []
+    };
     for (const key of uploadKeys) {
-      uploads[key] = await attachmentsFromForm(formData, key);
+      parsedUploads[key] = await attachmentsFromForm(formData, key);
     }
+    const uploads = filterSelectedUploads(requirementsNeeded, parsedUploads);
     deliveryState.completedStep = "attachments_parsed";
 
     assertRequiredUploadsPresent(application, uploads);
@@ -119,6 +128,11 @@ export async function POST(request: Request) {
         })
       : undefined;
     deliveryState.completedStep = "signature_certificate_generated";
+
+    console.info("Submission outgoing attachment summary.", {
+      attachmentCount: outgoingAttachmentCount({ athletePdf, nationalIdPdf, signatureCertificatePdf, uploads }),
+      totalBytes: outgoingAttachmentBytes({ athletePdf, nationalIdPdf, signatureCertificatePdf, uploads })
+    });
 
     const result = await sendApplicationEmails({
       submissionId,
@@ -161,15 +175,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, submissionId, ...result, promoterRecipient, deliveryState });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Submission failed.";
+    const errorType = classifySubmissionError(message, error);
     const isPartial = error instanceof SubmissionEmailDeliveryError && error.sentKinds.length > 0;
     if (error instanceof SubmissionEmailDeliveryError) {
       deliveryState.applicationEmailSent = error.sentKinds.includes("application");
       deliveryState.medicalEmailSent = error.sentKinds.includes("medical");
       deliveryState.completedStep = error.sentKinds.length ? `${error.sentKinds.join("_and_")}_email_sent` : "critical_email_send_started";
     }
-    console.error("API submission failed.", { submissionId, error: message });
+    console.error("API submission failed.", { submissionId, errorType });
     await sendSupportErrorNotification({
-      errorType: classifySubmissionError(message, error),
+      errorType,
       source: "app/api/submit-application POST",
       message,
       operation: "Complete fighter document submission",
@@ -354,4 +369,42 @@ function decodedHeader(headers: Headers, name: string) {
   } catch {
     return value;
   }
+}
+
+function outgoingAttachmentCount({
+  athletePdf,
+  nationalIdPdf,
+  signatureCertificatePdf,
+  uploads
+}: {
+  athletePdf?: { content: Buffer };
+  nationalIdPdf?: { content: Buffer };
+  signatureCertificatePdf?: { content: Buffer };
+  uploads: Partial<Record<UploadKey, Array<{ content: Buffer }>>>;
+}) {
+  return [
+    athletePdf,
+    nationalIdPdf,
+    signatureCertificatePdf,
+    ...Object.values(uploads).flat()
+  ].filter(Boolean).length;
+}
+
+function outgoingAttachmentBytes({
+  athletePdf,
+  nationalIdPdf,
+  signatureCertificatePdf,
+  uploads
+}: {
+  athletePdf?: { content: Buffer };
+  nationalIdPdf?: { content: Buffer };
+  signatureCertificatePdf?: { content: Buffer };
+  uploads: Partial<Record<UploadKey, Array<{ content: Buffer }>>>;
+}) {
+  return [
+    athletePdf,
+    nationalIdPdf,
+    signatureCertificatePdf,
+    ...Object.values(uploads).flat()
+  ].reduce((total, attachment) => total + (attachment?.content.length || 0), 0);
 }

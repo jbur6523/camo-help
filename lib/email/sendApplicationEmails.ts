@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
 import { safeErrorMessage, sendSupportErrorNotification } from "@/lib/email/supportNotifications";
 import { independentPromoterId } from "@/lib/promoters/constants";
+import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
 
@@ -146,21 +147,22 @@ export function buildSubmissionEmailMessages(
 ) {
   const name = fullName(payload.application);
   const requirementsNeeded = payload.application.requirementsNeeded || [];
+  const uploads = filterSelectedUploads(requirementsNeeded, payload.uploads);
   const applicationAttachments = [
     ...(requirementsNeeded.includes("athleteLicenseApplication") && payload.athletePdf ? [payload.athletePdf] : []),
     ...(requirementsNeeded.includes("nationalMmaIdApplication") && payload.nationalIdPdf ? [payload.nationalIdPdf] : []),
     ...(payload.signatureCertificatePdf ? [payload.signatureCertificatePdf] : []),
-    ...(requirementsNeeded.includes("headshot") ? payload.uploads.headshot || [] : []),
-    ...(requirementsNeeded.includes("photoId") ? payload.uploads.photoId || [] : [])
+    ...(uploads.headshot || []),
+    ...(uploads.photoId || [])
   ];
   const uploadedMedicalAttachments = [
-    ...(payload.uploads.bloodwork || []),
-    ...(payload.uploads.physical || []),
-    ...(payload.uploads.cardio || [])
+    ...(uploads.bloodwork || []),
+    ...(uploads.physical || []),
+    ...(uploads.cardio || [])
   ];
   const medicalAttachments = [
     ...uploadedMedicalAttachments,
-    ...(uploadedMedicalAttachments.length ? payload.uploads.additional || [] : [])
+    ...(uploadedMedicalAttachments.length ? uploads.additional || [] : [])
   ];
   const messages: SubmissionEmailMessage[] = [];
 
@@ -178,8 +180,8 @@ export function buildSubmissionEmailMessages(
     messages.push({
       kind: "medical",
       to: medicalRecipient,
-      subject: buildMedicalEmailSubject(name, payload.uploads),
-      text: buildMedicalEmailBody(payload.application, payload.uploads),
+      subject: buildMedicalEmailSubject(name, uploads),
+      text: buildMedicalEmailBody(payload.application, uploads),
       attachments: medicalAttachments
     });
   }

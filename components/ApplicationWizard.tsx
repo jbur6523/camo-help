@@ -17,6 +17,12 @@ import { formatPacificDate } from "@/lib/dates";
 import { generateAthleteLicensePdf } from "@/lib/pdf/generateAthleteLicensePdf";
 import { generateNationalIdPdf } from "@/lib/pdf/generateNationalIdPdf";
 import { athleteLicenseTemplatePath, nationalIdTemplatePath } from "@/lib/pdf/pdfFieldNameMap";
+import { filterSelectedUploads } from "@/lib/submission/filterSelectedUploads";
+import {
+  fileTooLargeMessage,
+  maxSingleOutgoingFileBytes,
+  submissionSizeProblem
+} from "@/lib/submission/outgoingFileValidation";
 import {
   calculateAge,
   defaultApplicationData,
@@ -113,10 +119,19 @@ type SubmissionDeliveryState = {
 };
 
 const safeResponsePreviewLength = 180;
-const maxSingleOutgoingFileBytes = 4 * 1024 * 1024;
-const identityImageCompression: Record<Extract<UploadKey, "headshot" | "photoId">, { maxDimension: number; quality: number; filenamePrefix: string }> = {
+type ImageCompressionConfig = {
+  maxDimension: number;
+  quality: number;
+  filenamePrefix: string;
+  skipAtOrBelowBytes?: number;
+};
+const imageCompression: Record<UploadKey, ImageCompressionConfig | null> = {
   headshot: { maxDimension: 1200, quality: 0.82, filenamePrefix: "headshot-selfie" },
-  photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id" }
+  photoId: { maxDimension: 1600, quality: 0.82, filenamePrefix: "driver-license-state-id" },
+  bloodwork: { maxDimension: 1800, quality: 0.78, filenamePrefix: "bloodwork-document", skipAtOrBelowBytes: 650 * 1024 },
+  physical: { maxDimension: 1800, quality: 0.78, filenamePrefix: "physical-document", skipAtOrBelowBytes: 650 * 1024 },
+  cardio: { maxDimension: 1800, quality: 0.78, filenamePrefix: "cardio-ekg-document", skipAtOrBelowBytes: 650 * 1024 },
+  additional: { maxDimension: 1800, quality: 0.78, filenamePrefix: "additional-document", skipAtOrBelowBytes: 650 * 1024 }
 };
 
 export function ApplicationWizard() {
@@ -307,7 +322,7 @@ export function ApplicationWizard() {
     if (!preparedFiles.length) return;
     const oversizedFile = preparedFiles.find((file) => file.size > maxSingleOutgoingFileBytes);
     if (oversizedFile) {
-      fail(fileTooLargeMessage(oversizedFile.name));
+      fail(fileTooLargeMessage());
       return;
     }
     setUploadFiles((current) => {
@@ -565,7 +580,11 @@ export function ApplicationWizard() {
       const finalEmail = form.getValues("email").trim();
       if (!isValidEmail(finalEmail)) {
         setFinalEmailError("Enter a valid email address.");
-        setGlobalError("Confirm a valid email address and generate forms before submitting.");
+        setGlobalError(
+          documentsOnly
+            ? "Confirm a valid email address before submitting."
+            : "Confirm a valid email address and generate forms before submitting."
+        );
         submissionInFlightRef.current = false;
         setIsBusy(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -574,12 +593,13 @@ export function ApplicationWizard() {
       setFinalEmailError("");
       setValue("email", finalEmail, { shouldValidate: true, shouldDirty: true });
 
-      const generated = pdfs?.email === finalEmail ? pdfs : null;
+      const generated = pdfs?.email === finalEmail ? pdfs : documentsOnly ? { email: finalEmail } : null;
       if (!generated) {
         setSubmissionFailure({ kind: "failed", submissionId });
         return;
       }
       const values = form.getValues();
+      const selectedUploadFiles = filterSelectedUploads(values.requirementsNeeded, uploadFiles);
       const formData = new FormData();
       formData.append("submissionId", submissionId);
       formData.append("application", JSON.stringify(values));
@@ -589,11 +609,11 @@ export function ApplicationWizard() {
       if (generated.nationalBlob) {
         formData.append("nationalIdPdf", new File([generated.nationalBlob], "completed-national-mma-id.pdf", { type: "application/pdf" }));
       }
-      (Object.entries(uploadFiles) as Array<[UploadKey, File[] | undefined]>).forEach(([key, files]) => {
+      (Object.entries(selectedUploadFiles) as Array<[UploadKey, File[] | undefined]>).forEach(([key, files]) => {
         (files || []).forEach((file) => formData.append(key, file));
       });
 
-      const outgoingFiles = collectSubmissionFileSummaries(generated, uploadFiles);
+      const outgoingFiles = collectSubmissionFileSummaries(generated, selectedUploadFiles);
       const sizeProblem = submissionSizeProblem(outgoingFiles);
       if (sizeProblem) {
         console.warn("Frontend submission blocked because outgoing files are too large.", {
@@ -816,12 +836,15 @@ function GenerateStep({
             {emailError ? <div className="error" id="final-email-error">{emailError}</div> : null}
           </div>
         </section>
-        {!hasCurrentGeneratedForms ? (
-          <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
-            {isBusy ? "Working..." : documentsOnly ? "Confirm Email & Submit Documents" : "Confirm Email & Generate Forms"}
+        {documentsOnly ? (
+          <button className="button primary submit-documents-button" type="button" onClick={onSubmit} disabled={isBusy}>
+            {isBusy ? "Submitting..." : "Submit Selected Documents"}
           </button>
-        ) : null}
-        {hasCurrentGeneratedForms ? (
+        ) : !hasCurrentGeneratedForms ? (
+          <button className="button primary" type="button" onClick={onGenerate} disabled={isBusy}>
+            {isBusy ? "Working..." : "Confirm Email & Generate Forms"}
+          </button>
+        ) : (
           <>
             {pdfs?.athleteUrl || pdfs?.nationalUrl ? (
               <div className="download-list">
@@ -841,7 +864,7 @@ function GenerateStep({
               {isBusy ? "Working..." : "Submit Documents"}
             </button>
           </>
-        ) : null}
+        )}
       </div>
     </>
   );
@@ -870,16 +893,19 @@ function isValidEmail(email: string) {
 }
 
 async function prepareUploadFiles(key: UploadKey, files: File[]) {
-  if (key !== "headshot" && key !== "photoId") return files;
+  const config = imageCompression[key];
+  if (!config) return files;
 
-  const config = identityImageCompression[key];
   return Promise.all(
     files.map(async (file) => {
       if (!file.type.startsWith("image/")) {
-        throw new Error("Identity uploads must be image files.");
+        return file;
+      }
+      if (config.skipAtOrBelowBytes && file.size <= config.skipAtOrBelowBytes) {
+        return file;
       }
       try {
-        return await compressIdentityImage(file, config);
+        return await compressImageFile(file, config);
       } catch {
         return file;
       }
@@ -887,7 +913,7 @@ async function prepareUploadFiles(key: UploadKey, files: File[]) {
   );
 }
 
-async function compressIdentityImage(
+async function compressImageFile(
   file: File,
   {
     maxDimension,
@@ -909,7 +935,8 @@ async function compressIdentityImage(
   context.drawImage(image, 0, 0, width, height);
   const blob = await canvasToJpegBlob(canvas, quality);
   URL.revokeObjectURL(image.src);
-  return new File([blob], compressedIdentityFilename(file.name, filenamePrefix), {
+  if (blob.size >= file.size) return file;
+  return new File([blob], compressedImageFilename(file.name, filenamePrefix), {
     type: "image/jpeg",
     lastModified: Date.now()
   });
@@ -950,7 +977,7 @@ function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number) {
   });
 }
 
-function compressedIdentityFilename(originalName: string, prefix: string) {
+function compressedImageFilename(originalName: string, prefix: string) {
   const baseName = originalName.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
   return `${prefix}${baseName ? `-${baseName}` : ""}.jpg`;
 }
@@ -985,24 +1012,6 @@ function collectSubmissionFileSummaries(generated: GeneratedPdfs, uploadFiles: U
 
 function totalFileBytes(files: SubmissionFileSummary[]) {
   return files.reduce((total, file) => total + file.size, 0);
-}
-
-function submissionSizeProblem(files: SubmissionFileSummary[]) {
-  const oversizedFile = files.find((file) => file.size > maxSingleOutgoingFileBytes);
-  if (oversizedFile) {
-    return fileTooLargeMessage(oversizedFile.filename);
-  }
-
-  return "";
-}
-
-function fileTooLargeMessage(filename: string) {
-  return [
-    `This file is too large to submit: ${filename}.`,
-    "Please upload a smaller image or PDF.",
-    "If you are uploading a full-resolution phone photo, try taking a screenshot of the image/document and uploading the screenshot instead. Screenshots are usually much smaller and are often easier to submit.",
-    "For lab results, physical forms, or document images, you can also try saving the document as a smaller PDF, retaking the photo closer to the document, or cropping out unnecessary background before uploading."
-  ].join(" ");
 }
 
 async function readSubmitApplicationResponse(response: Response): Promise<{
