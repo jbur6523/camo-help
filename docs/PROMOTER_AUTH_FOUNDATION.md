@@ -8,6 +8,33 @@
 - Baseline commit: `2a22cf76dd2ca1f07d31042e04a3d535757b24cb`
 - Baseline reason: `origin/main` did not contain either AI provider-handling commit `e465abbb417492fc4d694150302ebbebffd290e5` or the later smartphone JPEG fix at `2a22cf7`.
 
+## Isolated Supabase environment
+
+An isolated hosted project exists specifically for promoter-auth migration and synthetic acceptance testing:
+
+- Project name: `camo-help-promoter-auth-isolated-20260723`
+- Project ref: `belobqleplifgqawvmcj`
+- Organization: `Bestie Development System`
+- Region: `us-west-2`
+- Compute size: `nano`
+- Created: July 23, 2026
+
+The repository is linked through the Supabase CLI. The generated database password is held in the CLI's native credential storage and is not committed or printed in project documentation. The linked project reference is stored only under the ignored `supabase/.temp` directory.
+
+The isolated project has:
+
+- `202607220000_promoters_base.sql` applied;
+- `202607220001_promoter_auth_foundation.sql` applied;
+- email/password signup enabled;
+- minimum password length set to eight;
+- email confirmation disabled for this isolated flow;
+- Site URL set to `http://localhost:3000`;
+- `http://localhost:3000/auth/callback` allowlisted;
+- TOTP enrollment and verification left enabled;
+- no promoter or account rows after synthetic verification cleanup.
+
+Remote verification confirmed RLS on both promoter tables, all one-to-one constraints, the normalized-email index, service-role-only RPC execution, hidden pending promoters for anonymous callers, and authenticated self-profile access. No live CAMO-Help, Preview, or Production project was changed.
+
 ## Account model
 
 Promoters create their own password during registration. Supabase Auth stores, hashes, and manages the password. CAMO-Help does not store passwords, password hashes, reset tokens, temporary passwords, or session tokens in application tables.
