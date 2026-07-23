@@ -60,6 +60,10 @@ const formats: FormatDefinition[] = [
 ];
 
 const documentCheckKinds = new Set<DocumentKind>(["jpeg", "png", "pdf"]);
+// Some image editors append a small metadata or padding block after JPEG EOI.
+// Keep that compatibility bounded; every scan is also capped by the per-file policy.
+const maxJpegTrailingBytes = 64 * 1024;
+const maxJpegMarkerCount = 65_536;
 
 export async function validateUploadedDocument(
   input: UploadedDocumentInput,
@@ -152,7 +156,7 @@ function signatureMatches(bytes: Uint8Array, kind: DocumentKind) {
 
 function hasReadableImageStructure(bytes: Uint8Array, kind: Exclude<DocumentKind, "pdf">) {
   if (kind === "jpeg") {
-    return bytes.byteLength >= 4 && bytes[bytes.byteLength - 2] === 0xff && bytes[bytes.byteLength - 1] === 0xd9;
+    return hasReadableJpegStructure(bytes);
   }
   if (kind === "png") {
     return bytes.byteLength >= 45 && ascii(bytes, 12, 4) === "IHDR" && includesAscii(bytes, "IEND");
@@ -160,6 +164,89 @@ function hasReadableImageStructure(bytes: Uint8Array, kind: Exclude<DocumentKind
   if (kind === "gif") return bytes.byteLength >= 14;
   if (kind === "webp") return bytes.byteLength >= 16;
   return bytes.byteLength >= 16;
+}
+
+function hasReadableJpegStructure(bytes: Uint8Array) {
+  if (bytes.byteLength < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return false;
+
+  let offset = 2;
+  let markerCount = 0;
+  let sawFrame = false;
+  let sawScan = false;
+
+  while (offset < bytes.byteLength) {
+    if (bytes[offset] !== 0xff) return false;
+
+    while (offset < bytes.byteLength && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.byteLength) return false;
+
+    const marker = bytes[offset];
+    offset += 1;
+    markerCount += 1;
+    if (markerCount > maxJpegMarkerCount || marker === 0x00 || marker === 0xd8) return false;
+
+    if (marker === 0xd9) {
+      return sawFrame && sawScan && bytes.byteLength - offset <= maxJpegTrailingBytes;
+    }
+
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.byteLength) return false;
+
+    const segmentLength = (bytes[offset] << 8) | bytes[offset + 1];
+    if (segmentLength < 2) return false;
+    const segmentEnd = offset + segmentLength;
+    if (segmentEnd > bytes.byteLength) return false;
+
+    if (isJpegFrameMarker(marker)) {
+      const componentCount = bytes[offset + 7];
+      if (!componentCount || segmentLength !== 8 + 3 * componentCount) return false;
+      sawFrame = true;
+    }
+
+    if (marker !== 0xda) {
+      offset = segmentEnd;
+      continue;
+    }
+
+    const scanComponentCount = bytes[offset + 2];
+    if (!sawFrame || !scanComponentCount || segmentLength !== 6 + 2 * scanComponentCount) return false;
+    sawScan = true;
+    offset = segmentEnd;
+
+    // Scan entropy-coded data without decoding pixels. FF 00 is escaped data,
+    // restart markers remain inside the scan, and any other marker returns to
+    // the bounded marker parser above.
+    while (offset < bytes.byteLength) {
+      if (bytes[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+
+      const markerStart = offset;
+      while (offset < bytes.byteLength && bytes[offset] === 0xff) offset += 1;
+      if (offset >= bytes.byteLength) return false;
+
+      const scanMarker = bytes[offset];
+      if (scanMarker === 0x00 || (scanMarker >= 0xd0 && scanMarker <= 0xd7)) {
+        offset += 1;
+        continue;
+      }
+
+      offset = markerStart;
+      break;
+    }
+  }
+
+  return false;
+}
+
+function isJpegFrameMarker(marker: number) {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
 }
 
 function startsWith(bytes: Uint8Array, signature: number[]) {

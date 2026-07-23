@@ -18,7 +18,10 @@ import {
 import { MemoryDocumentCheckRateLimiter } from "@/lib/document-check/testing/MemoryRateLimiter";
 import type { DocumentCheckRateLimiter, DocumentCheckRateLimitReason } from "@/lib/document-check/rateLimit";
 import { assertDocumentCheckRequestHeaders } from "@/lib/document-check/requestPolicy";
-import { validateUploadedDocument } from "@/lib/files/serverDocumentValidation";
+import {
+  DocumentValidationError,
+  validateUploadedDocument
+} from "@/lib/files/serverDocumentValidation";
 import { UpstashDocumentCheckRateLimiter } from "@/lib/document-check/upstashRateLimiter";
 
 export const runtime = "nodejs";
@@ -138,8 +141,9 @@ export async function POST(request: Request) {
         { bytes: new Uint8Array(await file.arrayBuffer()), declaredMimeType: file.type, filename: file.name },
         "document-check"
       );
-    } catch {
-      return fail("DOCUMENT_VALIDATION_FAILED", false);
+    } catch (error) {
+      if (error instanceof DocumentValidationError) return fail(error.reasonCode, false);
+      return fail("PROCESSING_ERROR", true);
     }
     if (categoryValue !== "bloodwork" && categoryValue !== "physical") return fail("INVALID_REQUEST", false);
 

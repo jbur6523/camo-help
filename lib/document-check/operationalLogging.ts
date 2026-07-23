@@ -1,11 +1,12 @@
 import type { DocumentCheckUnavailableReason } from "@/lib/document-check/provider";
+import type { DocumentValidationReasonCode } from "@/lib/files/serverDocumentValidation";
 
 export type DocumentCheckOperationalReasonCode =
   | DocumentCheckUnavailableReason
+  | DocumentValidationReasonCode
   | "FEATURE_DISABLED"
   | "REQUEST_POLICY_REJECTED"
-  | "INVALID_REQUEST"
-  | "DOCUMENT_VALIDATION_FAILED";
+  | "INVALID_REQUEST";
 
 type OperationalLog = {
   outcome: "unavailable" | "cleanup_failure";
