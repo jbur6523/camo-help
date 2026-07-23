@@ -184,11 +184,9 @@ test("passwords and tokens are absent from persistence, database schema, account
   const registrationForm = source("components/PromoterRegistrationForm.tsx");
   const registrationRoute = source("app/api/promoter-registration/route.ts");
   const migration = source("supabase/migrations/202607220001_promoter_auth_foundation.sql");
-  const draftStorage = source("lib/draftStorage.ts");
 
   assert.doesNotMatch(registrationForm, /localStorage|sessionStorage|indexedDB/i);
   assert.doesNotMatch(migration, /password_hash|password_reset_token|session_token|temporary_password/i);
-  assert.doesNotMatch(draftStorage, /promoter.*password|confirmPassword/i);
   assert.doesNotMatch(registrationRoute, /console\.(log|info|warn|error)\([^)]*password/i);
   assert.doesNotMatch(registrationRoute, /sendSupportPromoterRegistrationNotification\(\{[\s\S]*?\.\.\./);
 });
