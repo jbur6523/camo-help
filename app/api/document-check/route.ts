@@ -3,27 +3,28 @@ import { getDocumentCheckConfig } from "@/lib/document-check/config";
 import { resolveClientIdentifierHash } from "@/lib/document-check/clientIdentifier";
 import { MockDocumentCheckProvider } from "@/lib/document-check/mockProvider";
 import {
-  publicReasons,
-  type PublicDocumentCheckReason
-} from "@/lib/document-check/messages";
+  logDocumentCheckOperationalFailure,
+  type DocumentCheckOperationalReasonCode
+} from "@/lib/document-check/operationalLogging";
 import { OpenAIDocumentCheckProvider } from "@/lib/document-check/openaiProvider";
-import { runDocumentCheck, type DocumentCheckCategory } from "@/lib/document-check/provider";
+import {
+  runDocumentCheck,
+  type DocumentCheckCategory
+} from "@/lib/document-check/provider";
+import {
+  documentCheckOutcomeToPublicResponse,
+  type PublicDocumentCheckResponse
+} from "@/lib/document-check/publicResponse";
 import { MemoryDocumentCheckRateLimiter } from "@/lib/document-check/testing/MemoryRateLimiter";
-import type { DocumentCheckRateLimiter } from "@/lib/document-check/rateLimit";
+import type { DocumentCheckRateLimiter, DocumentCheckRateLimitReason } from "@/lib/document-check/rateLimit";
 import { assertDocumentCheckRequestHeaders } from "@/lib/document-check/requestPolicy";
-import { validateUploadedDocument, DocumentValidationError } from "@/lib/files/serverDocumentValidation";
+import { validateUploadedDocument } from "@/lib/files/serverDocumentValidation";
 import { UpstashDocumentCheckRateLimiter } from "@/lib/document-check/upstashRateLimiter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type PublicResponse =
-  | { state: "passed" }
-  | { state: "review"; reasons: PublicDocumentCheckReason[] }
-  | { state: "unable_to_verify" }
-  | { state: "unavailable"; retryable: boolean };
-
-function json(response: PublicResponse, status = 200) {
+function json(response: PublicDocumentCheckResponse, status = 200) {
   return NextResponse.json(response, {
     status,
     headers: {
@@ -66,32 +67,70 @@ function createProvider(config: ReturnType<typeof getDocumentCheckConfig>) {
   return new OpenAIDocumentCheckProvider({ apiKey: config.openAiApiKey, model: config.model });
 }
 
+function rateLimitOperationalReason(reasonCode: DocumentCheckRateLimitReason): DocumentCheckOperationalReasonCode {
+  if (reasonCode === "BACKEND_UNAVAILABLE") return "RATE_LIMIT_INFRASTRUCTURE_FAILURE";
+  if (reasonCode === "MONTHLY_USAGE_LIMIT") return "USAGE_LIMIT_REACHED";
+  return "RATE_LIMIT_REACHED";
+}
+
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  let providerInvoked = false;
+  const fail = (
+    reasonCode: DocumentCheckOperationalReasonCode,
+    retryable = true,
+    status = 200
+  ) => {
+    logDocumentCheckOperationalFailure({ reasonCode, startedAt, providerInvoked });
+    return unavailable(retryable, status);
+  };
+
   const config = getDocumentCheckConfig();
-  if (!config.enabled) return unavailable(false);
-  if (!config.valid || !config.hashSecret) return unavailable(false);
+  if (!config.valid) {
+    return fail(
+      config.invalidReason === "RATE_LIMIT_CONFIGURATION_MISSING"
+        ? "RATE_LIMIT_INFRASTRUCTURE_FAILURE"
+        : "PROVIDER_AUTHENTICATION_OR_CONFIGURATION_FAILURE",
+      false
+    );
+  }
+  if (!config.enabled) return fail("FEATURE_DISABLED", false);
+  if (!config.hashSecret) return fail("RATE_LIMIT_INFRASTRUCTURE_FAILURE", false);
   try {
     assertDocumentCheckRequestHeaders(request.headers);
   } catch {
-    return unavailable(false);
+    return fail("REQUEST_POLICY_REJECTED", false);
   }
 
   const limiter = createRateLimiter(config);
-  if (!limiter) return unavailable(true);
+  if (!limiter) return fail("RATE_LIMIT_INFRASTRUCTURE_FAILURE", true);
   let leaseId: string | undefined;
   try {
-    const decision = await limiter.acquire({
-      clientIdentifierHash: resolveClientIdentifierHash(request, config.hashSecret),
-      now: Date.now()
-    });
-    if (!decision.allowed) return unavailable(decision.reasonCode !== "MONTHLY_USAGE_LIMIT");
+    let decision;
+    try {
+      decision = await limiter.acquire({
+        clientIdentifierHash: resolveClientIdentifierHash(request, config.hashSecret),
+        now: Date.now()
+      });
+    } catch {
+      return fail("RATE_LIMIT_INFRASTRUCTURE_FAILURE", true);
+    }
+    if (!decision.allowed) {
+      const reasonCode = rateLimitOperationalReason(decision.reasonCode);
+      return fail(reasonCode, decision.reasonCode !== "MONTHLY_USAGE_LIMIT");
+    }
     leaseId = decision.leaseId;
 
-    const formData = await request.formData();
-    if (formData.has("prompt")) return unavailable(false);
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return fail("INVALID_REQUEST", false);
+    }
+    if (formData.has("prompt")) return fail("INVALID_REQUEST", false);
     const categoryValue = formData.get("category");
     const files = formData.getAll("file");
-    if (files.length !== 1 || !(files[0] instanceof File)) return unavailable(false);
+    if (files.length !== 1 || !(files[0] instanceof File)) return fail("INVALID_REQUEST", false);
     const file = files[0];
     let document;
     try {
@@ -99,18 +138,26 @@ export async function POST(request: Request) {
         { bytes: new Uint8Array(await file.arrayBuffer()), declaredMimeType: file.type, filename: file.name },
         "document-check"
       );
-    } catch (error) {
-      if (error instanceof DocumentValidationError) return unavailable(false);
-      return unavailable(false);
+    } catch {
+      return fail("DOCUMENT_VALIDATION_FAILED", false);
     }
-    if (categoryValue !== "bloodwork" && categoryValue !== "physical") return unavailable(false);
+    if (categoryValue !== "bloodwork" && categoryValue !== "physical") return fail("INVALID_REQUEST", false);
 
     const provider = createProvider(config);
-    if (!provider) return unavailable(false);
+    if (!provider) return fail("PROVIDER_AUTHENTICATION_OR_CONFIGURATION_FAILURE", false);
     if (config.provider === "openai") {
-      const budget = await limiter.consumeProviderBudget(leaseId);
-      if (!budget.allowed) return unavailable(budget.reasonCode !== "MONTHLY_USAGE_LIMIT");
+      let budget;
+      try {
+        budget = await limiter.consumeProviderBudget(leaseId);
+      } catch {
+        return fail("RATE_LIMIT_INFRASTRUCTURE_FAILURE", true);
+      }
+      if (!budget.allowed) {
+        const reasonCode = rateLimitOperationalReason(budget.reasonCode);
+        return fail(reasonCode, budget.reasonCode !== "MONTHLY_USAGE_LIMIT");
+      }
     }
+    providerInvoked = true;
     const outcome = await runDocumentCheck({
       provider,
       document,
@@ -119,19 +166,22 @@ export async function POST(request: Request) {
       signal: request.signal
     });
     if (outcome.kind === "unavailable") {
-      return unavailable(!["REQUEST_CANCELLED", "UNSUPPORTED_FILE"].includes(outcome.reasonCode));
+      logDocumentCheckOperationalFailure({ reasonCode: outcome.reasonCode, startedAt, providerInvoked });
     }
-    if (outcome.result.status === "pass") return json({ state: "passed" });
-    if (outcome.result.status === "unable_to_verify") return json({ state: "unable_to_verify" });
-    return json({ state: "review", reasons: publicReasons(outcome.result) });
+    return json(documentCheckOutcomeToPublicResponse(outcome));
   } catch {
-    return unavailable(true);
+    return fail("PROCESSING_ERROR", true);
   } finally {
     if (leaseId) {
       try {
         await limiter.release(leaseId);
       } catch {
-        // Release is best effort; the lock TTL is the recovery boundary.
+        logDocumentCheckOperationalFailure({
+          reasonCode: "RATE_LIMIT_INFRASTRUCTURE_FAILURE",
+          startedAt,
+          providerInvoked,
+          outcome: "cleanup_failure"
+        });
       }
     }
   }

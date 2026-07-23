@@ -44,7 +44,6 @@ export const documentCheckResultJsonSchema = {
       type: "array",
       minItems: 1,
       maxItems: 3,
-      uniqueItems: true,
       items: { type: "string", enum: documentCheckReasonCodeSchema.options }
     },
     confidence: { type: "string", enum: ["high", "medium", "low"] }

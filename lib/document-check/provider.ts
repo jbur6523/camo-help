@@ -9,15 +9,28 @@ export type DocumentCheckProvider = {
 };
 
 export type DocumentCheckUnavailableReason =
-  | "TIMEOUT"
+  | "INVALID_STRUCTURED_OUTPUT_SCHEMA"
+  | "INCOMPLETE_MAX_OUTPUT_TOKENS"
+  | "INCOMPLETE_PROVIDER_RESPONSE"
+  | "EMPTY_PROVIDER_OUTPUT"
+  | "MALFORMED_PROVIDER_OUTPUT"
+  | "PROVIDER_AUTHENTICATION_OR_CONFIGURATION_FAILURE"
+  | "PROVIDER_TIMEOUT"
   | "PROVIDER_UNAVAILABLE"
-  | "MALFORMED_PROVIDER_RESPONSE"
   | "REQUEST_CANCELLED"
   | "RATE_LIMIT_REACHED"
+  | "RATE_LIMIT_INFRASTRUCTURE_FAILURE"
   | "USAGE_LIMIT_REACHED"
   | "UNSUPPORTED_FILE"
   | "PROCESSING_ERROR"
   | "DUPLICATE_REQUEST";
+
+export class DocumentCheckProviderError extends Error {
+  constructor(readonly reasonCode: DocumentCheckUnavailableReason) {
+    super("Document-check provider operation failed.");
+    this.name = "DocumentCheckProviderError";
+  }
+}
 
 export type DocumentCheckOutcome =
   | { kind: "result"; result: DocumentCheckResult }
@@ -52,11 +65,14 @@ export async function runDocumentCheck({
   try {
     const rawResult = await Promise.race([provider.check({ document, category: category || "bloodwork" }, controller.signal), aborted]);
     const parsed = documentCheckResultSchema.safeParse(rawResult);
-    if (!parsed.success) return { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_RESPONSE" };
+    if (!parsed.success) return { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_OUTPUT" };
     return { kind: "result", result: parsed.data };
   } catch (error) {
-    if (timedOut) return { kind: "unavailable", reasonCode: "TIMEOUT" };
+    if (timedOut) return { kind: "unavailable", reasonCode: "PROVIDER_TIMEOUT" };
     if (signal?.aborted || controller.signal.aborted) return { kind: "unavailable", reasonCode: "REQUEST_CANCELLED" };
+    if (error instanceof DocumentCheckProviderError) {
+      return { kind: "unavailable", reasonCode: error.reasonCode };
+    }
     return { kind: "unavailable", reasonCode: "PROVIDER_UNAVAILABLE" };
   } finally {
     clearTimeout(timeout);

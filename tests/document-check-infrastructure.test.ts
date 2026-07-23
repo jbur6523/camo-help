@@ -27,8 +27,8 @@ test("provider boundary accepts pass, review, and unable-to-verify results", asy
 
 test("malformed, timeout, and unavailable provider responses become unavailable, never pass", async () => {
   const expectations = [
-    ["malformed", "MALFORMED_PROVIDER_RESPONSE"],
-    ["timeout", "TIMEOUT"],
+    ["malformed", "MALFORMED_PROVIDER_OUTPUT"],
+    ["timeout", "PROVIDER_TIMEOUT"],
     ["unavailable", "PROVIDER_UNAVAILABLE"]
   ] as const;
   for (const [scenario, reasonCode] of expectations) {
@@ -42,7 +42,21 @@ test("server timeout completes even if a provider ignores AbortSignal", async ()
   const provider = { check: async () => new Promise<never>(() => undefined) };
   assert.deepEqual(await runDocumentCheck({ provider, document, timeoutMs: 5 }), {
     kind: "unavailable",
-    reasonCode: "TIMEOUT"
+    reasonCode: "PROVIDER_TIMEOUT"
+  });
+});
+
+test("duplicate reason codes remain rejected by server-side Zod validation", async () => {
+  const provider = {
+    check: async () => ({
+      status: "review",
+      reasonCodes: ["SIGNATURE_NOT_FOUND", "SIGNATURE_NOT_FOUND"],
+      confidence: "medium"
+    })
+  };
+  assert.deepEqual(await runDocumentCheck({ provider, document, timeoutMs: 100 }), {
+    kind: "unavailable",
+    reasonCode: "MALFORMED_PROVIDER_OUTPUT"
   });
 });
 
@@ -103,10 +117,15 @@ test("provider budget is consumed only at the provider boundary", async () => {
 
 test("normal submission stays independent after every optional AI outcome", () => {
   const outcomes: DocumentCheckOutcome[] = [
-    { kind: "unavailable", reasonCode: "TIMEOUT" },
+    { kind: "unavailable", reasonCode: "PROVIDER_TIMEOUT" },
     { kind: "unavailable", reasonCode: "PROVIDER_UNAVAILABLE" },
-    { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_RESPONSE" },
+    { kind: "unavailable", reasonCode: "INVALID_STRUCTURED_OUTPUT_SCHEMA" },
+    { kind: "unavailable", reasonCode: "INCOMPLETE_MAX_OUTPUT_TOKENS" },
+    { kind: "unavailable", reasonCode: "EMPTY_PROVIDER_OUTPUT" },
+    { kind: "unavailable", reasonCode: "MALFORMED_PROVIDER_OUTPUT" },
+    { kind: "unavailable", reasonCode: "PROVIDER_AUTHENTICATION_OR_CONFIGURATION_FAILURE" },
     { kind: "unavailable", reasonCode: "RATE_LIMIT_REACHED" },
+    { kind: "unavailable", reasonCode: "RATE_LIMIT_INFRASTRUCTURE_FAILURE" },
     { kind: "unavailable", reasonCode: "UNSUPPORTED_FILE" },
     { kind: "result", result: { status: "review", reasonCodes: ["SIGNATURE_NOT_FOUND"], confidence: "medium" } }
   ];
@@ -122,7 +141,10 @@ test("normal submission stays independent after every optional AI outcome", () =
     assert.equal(messages.length, 1);
     assert.equal(messages[0]?.kind, "medical");
     const serialized = JSON.stringify(messages);
-    assert.doesNotMatch(serialized, /NO_OBVIOUS_ISSUE|SIGNATURE_NOT_FOUND|TIMEOUT|PROVIDER_UNAVAILABLE|RATE_LIMIT_REACHED/);
+    assert.doesNotMatch(
+      serialized,
+      /NO_OBVIOUS_ISSUE|SIGNATURE_NOT_FOUND|PROVIDER_TIMEOUT|PROVIDER_UNAVAILABLE|INCOMPLETE_MAX_OUTPUT_TOKENS|RATE_LIMIT_INFRASTRUCTURE_FAILURE/
+    );
     assert.ok(outcome);
   }
 });
