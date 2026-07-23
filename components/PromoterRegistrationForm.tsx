@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { promoterRegistrationSchema, type PromoterRegistrationInput } from "@/lib/promoters/registrationSchema";
 
 type FieldName = keyof PromoterRegistrationInput;
@@ -25,9 +26,9 @@ export function PromoterRegistrationForm() {
   return (
     <main className="app-shell">
       <section className="wizard-body registration-page">
-        <a className="button ghost registration-back-link" href="/">
+        <Link className="button ghost registration-back-link" href="/">
           Back to application
-        </a>
+        </Link>
         <h1 className="step-title">Promoter Registration</h1>
         <p className="step-help">
           Submit your promotion for review. Once approved, your promotion will appear for selection on the fighter application and you
