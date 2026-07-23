@@ -1,24 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
-import { promoterRegistrationSchema, type PromoterRegistrationInput } from "@/lib/promoters/registrationSchema";
+import {
+  promoterAccountRegistrationSchema,
+  type PromoterAccountRegistrationInput
+} from "@/lib/promoters/accountRegistrationSchema";
 
-type FieldName = keyof PromoterRegistrationInput;
+type FieldName = keyof PromoterAccountRegistrationInput;
 type FieldErrors = Partial<Record<FieldName | "governmentId", string>>;
 
-const initialForm: PromoterRegistrationInput = {
+const initialForm: PromoterAccountRegistrationInput = {
   promotionName: "",
   lastPromotionDate: "",
   promoterEmail: "",
   contactName: "",
-  websiteUrl: ""
+  websiteUrl: "",
+  password: "",
+  confirmPassword: ""
 };
 
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 export function PromoterRegistrationForm() {
-  const [form, setForm] = useState<PromoterRegistrationInput>(initialForm);
+  const [form, setForm] = useState<PromoterAccountRegistrationInput>(initialForm);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [globalMessage, setGlobalMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -27,13 +33,14 @@ export function PromoterRegistrationForm() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileError, setTurnstileError] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [showPasswords, setShowPasswords] = useState(false);
 
   return (
     <main className="app-shell">
       <section className="wizard-body registration-page">
-        <a className="button ghost registration-back-link" href="/">
-          Back to application
-        </a>
+        <Link className="button ghost registration-back-link" href="/promoters">
+          Back to promoter access
+        </Link>
         <h1 className="step-title">Promoter Registration</h1>
         <p className="step-help">
           Submit your promotion for review. Once approved, your promotion will appear for selection on the fighter application and you
@@ -42,7 +49,12 @@ export function PromoterRegistrationForm() {
 
         {submitted ? (
           <div className="notice">
-            <strong>Registration submitted.</strong> Your promotion will not appear for fighters until it is reviewed and approved.
+            <h2>Registration submitted</h2>
+            <p>Your promoter account has been created and is pending approval.</p>
+            <p>After your registration is approved, you can log in using the email and password you selected.</p>
+            <Link className="button primary auth-success-link" href="/promoters/login">
+              Go to promoter login
+            </Link>
           </div>
         ) : (
           <form className="field-grid" onSubmit={handleSubmit}>
@@ -78,6 +90,7 @@ export function PromoterRegistrationForm() {
               error={errors.promoterEmail}
               onChange={handleChange}
               type="email"
+              autoComplete="email"
               required
             />
             <RegistrationField
@@ -88,6 +101,38 @@ export function PromoterRegistrationForm() {
               onChange={handleChange}
               required
             />
+            <RegistrationField
+              label="Password"
+              name="password"
+              value={form.password}
+              error={errors.password}
+              onChange={handleChange}
+              type={showPasswords ? "text" : "password"}
+              autoComplete="new-password"
+              minLength={8}
+              required
+              helper="Use at least eight characters."
+            />
+            <RegistrationField
+              label="Confirm Password"
+              name="confirmPassword"
+              value={form.confirmPassword}
+              error={errors.confirmPassword}
+              onChange={handleChange}
+              type={showPasswords ? "text" : "password"}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+            <button
+              className="password-toggle"
+              type="button"
+              aria-controls="password confirmPassword"
+              aria-pressed={showPasswords}
+              onClick={() => setShowPasswords((current) => !current)}
+            >
+              {showPasswords ? "Hide passwords" : "Show passwords"}
+            </button>
             <GovernmentIdField
               file={governmentIdFile}
               error={errors.governmentId}
@@ -116,7 +161,7 @@ export function PromoterRegistrationForm() {
               onErrorMessageChange={setTurnstileError}
             />
             <button className="button primary" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit Registration"}
+              {isSubmitting ? "Creating account..." : "Create Account & Submit Registration"}
             </button>
           </form>
         )}
@@ -135,7 +180,7 @@ export function PromoterRegistrationForm() {
     event.preventDefault();
     setGlobalMessage("");
 
-    const parsed = promoterRegistrationSchema.safeParse(form);
+    const parsed = promoterAccountRegistrationSchema.safeParse(form);
     const nextErrors: FieldErrors = parsed.success ? {} : toFieldErrors(parsed.error.flatten().fieldErrors);
     if (!governmentIdFile) {
       nextErrors.governmentId = "Driver License / Government-Issued ID is required.";
@@ -199,6 +244,9 @@ function RegistrationField({
   inputMode,
   maxLength,
   placeholder,
+  autoComplete,
+  minLength,
+  helper,
   required = false
 }: {
   label: string;
@@ -210,6 +258,9 @@ function RegistrationField({
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   maxLength?: number;
   placeholder?: string;
+  autoComplete?: React.InputHTMLAttributes<HTMLInputElement>["autoComplete"];
+  minLength?: number;
+  helper?: string;
   required?: boolean;
 }) {
   return (
@@ -222,10 +273,13 @@ function RegistrationField({
         value={value}
         inputMode={inputMode}
         maxLength={maxLength}
+        minLength={minLength}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         required={required}
         onChange={(event) => onChange(name, event.currentTarget.value)}
       />
+      {helper ? <small>{helper}</small> : null}
       {error ? <div className="error">{error}</div> : null}
     </div>
   );

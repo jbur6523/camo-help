@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { formatPacificDateTime } from "@/lib/dates";
 import type { PromoterAdminAction } from "@/lib/promoters/statusTransitions";
-import type { PromoterStatus } from "@/lib/supabase/database.types";
+import type {
+  PromoterAccountLinkStatus,
+  PromoterStatus
+} from "@/lib/supabase/database.types";
 
 type AdminPromoter = {
   id: string;
@@ -14,6 +17,7 @@ type AdminPromoter = {
   governmentIdFileName: string;
   websiteUrl: string | null;
   status: PromoterStatus;
+  accountLinkStatus: PromoterAccountLinkStatus | null;
   createdAt: string;
 };
 
@@ -90,6 +94,10 @@ export function AdminPromotersDashboard() {
                 <span>Created</span>
                 <strong>{formatDate(promoter.createdAt)}</strong>
               </div>
+              <div className="review-line">
+                <span>Account link</span>
+                <strong>{accountLinkLabel(promoter.accountLinkStatus)}</strong>
+              </div>
               <div className="admin-actions">
                 {actionsForStatus(promoter.status).map((action) => (
                   <button
@@ -102,6 +110,16 @@ export function AdminPromotersDashboard() {
                     {busyPromoterId === promoter.id ? "Updating..." : actionLabels[action]}
                   </button>
                 ))}
+                {promoter.accountLinkStatus === "pending_admin_confirmation" ? (
+                  <button
+                    className="button primary"
+                    type="button"
+                    disabled={busyPromoterId === promoter.id}
+                    onClick={() => confirmAccountLink(promoter.id)}
+                  >
+                    {busyPromoterId === promoter.id ? "Updating..." : "Confirm Account Link"}
+                  </button>
+                ) : null}
               </div>
               {denyingPromoterId === promoter.id ? (
                 <div className="field denial-reason-field">
@@ -173,6 +191,24 @@ export function AdminPromotersDashboard() {
     }
   }
 
+  async function confirmAccountLink(promoterId: string) {
+    setBusyPromoterId(promoterId);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/promoters/${promoterId}/account-link`, {
+        method: "POST"
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not confirm account link.");
+      setMessage("Promoter account link confirmed.");
+      await loadPromoters();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not confirm account link.");
+    } finally {
+      setBusyPromoterId("");
+    }
+  }
+
   function startDenial(promoterId: string) {
     setDenyingPromoterId(promoterId);
     setDenialReason("");
@@ -207,4 +243,10 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return formatPacificDateTime(date);
+}
+
+function accountLinkLabel(status: PromoterAccountLinkStatus | null) {
+  if (status === "confirmed") return "Confirmed";
+  if (status === "pending_admin_confirmation") return "Needs admin confirmation";
+  return "No promoter account";
 }

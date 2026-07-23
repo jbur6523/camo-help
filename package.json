@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:promoter-auth": "tsx --test tests/promoter-auth.test.ts",
     "inspect:pdfs": "tsx scripts/inspect-pdf-fields.ts",
     "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.107.0",
     "next": "^14.2.30",
     "pdf-lib": "^1.17.1",

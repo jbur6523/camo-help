@@ -5,6 +5,7 @@ import {
   sendSupportErrorNotification,
   sendSupportPromoterStatusChangeNotification
 } from "@/lib/email/supportNotifications";
+import { promoterApprovalEmailText } from "@/lib/promoters/approvalEmail";
 import { nextPromoterStatus, type PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { PromoterStatus } from "@/lib/supabase/database.types";
@@ -68,14 +69,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       changedAt: new Date()
     });
 
+    let warning = "";
     if (promoter.status === "pending" && nextStatus === "active") {
-      await sendPromoterApprovalEmail({
+      const approvalEmailSent = await sendPromoterApprovalEmail({
         email: promoter.email,
         promotionName: promoter.promotion_name
       });
+      if (!approvalEmailSent) {
+        warning = "Promoter approved, but the approval email could not be sent.";
+      }
     }
 
-    let warning = "";
     if (promoter.status === "pending" && nextStatus === "denied") {
       const denialEmailSent = await sendPromoterDenialEmail({
         email: promoter.email,
@@ -192,7 +196,7 @@ async function sendPromoterApprovalEmail({
       message: "RESEND_API_KEY, EMAIL_FROM, or promoter email is not configured.",
       operation: "Send promoter approval email"
     });
-    return;
+    return false;
   }
 
   try {
@@ -201,15 +205,7 @@ async function sendPromoterApprovalEmail({
       from,
       to: email,
       subject: "Promoter Registration Approved",
-      text: [
-        "Congratulations.",
-        "",
-        `Your promoter registration${promotionName ? ` for ${promotionName}` : ""} has been approved on CAMO Help and your promotion is now listed and available for fighter selection.`,
-        "",
-        "Fighters can now choose your promotion when submitting documents through CAMO Help.",
-        "",
-        "If you need to update your information in the future, please contact support."
-      ].join("\n")
+      text: promoterApprovalEmailText(promotionName)
     });
 
     if (error) {
@@ -220,7 +216,9 @@ async function sendPromoterApprovalEmail({
         message: error.message,
         operation: "Send promoter approval email"
       });
+      return false;
     }
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error.";
     console.error(`Promoter approval email failed: ${message}`);
@@ -230,5 +228,6 @@ async function sendPromoterApprovalEmail({
       message,
       operation: "Send promoter approval email"
     });
+    return false;
   }
 }

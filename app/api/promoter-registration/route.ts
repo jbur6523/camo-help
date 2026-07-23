@@ -3,9 +3,14 @@ import {
   sendSupportErrorNotification,
   sendSupportPromoterRegistrationNotification
 } from "@/lib/email/supportNotifications";
-import { promoterRegistrationSchema, type PromoterRegistration } from "@/lib/promoters/registrationSchema";
+import { registerPromoterAccount } from "@/lib/promoters/accountRegistration";
+import { promoterAccountRegistrationSchema } from "@/lib/promoters/accountRegistrationSchema";
+import {
+  PromoterRegistrationOperationalError,
+  SupabasePromoterRegistrationGateway
+} from "@/lib/promoters/supabaseRegistrationGateway";
+import type { PromoterRegistration } from "@/lib/promoters/registrationSchema";
 import { turnstileErrorStatus, turnstileUserMessage, verifyTurnstileToken } from "@/lib/security/turnstile";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -51,9 +56,11 @@ export async function POST(request: Request) {
     lastPromotionDate: formValue(formData, "lastPromotionDate"),
     promoterEmail: formValue(formData, "promoterEmail"),
     contactName: formValue(formData, "contactName"),
-    websiteUrl: formValue(formData, "websiteUrl")
+    websiteUrl: formValue(formData, "websiteUrl"),
+    password: formValue(formData, "password"),
+    confirmPassword: formValue(formData, "confirmPassword")
   };
-  const parsed = promoterRegistrationSchema.safeParse(body);
+  const parsed = promoterAccountRegistrationSchema.safeParse(body);
   const governmentId = await attachmentFromForm(formData, "governmentId");
   if (!parsed.success) {
     return NextResponse.json(
@@ -84,43 +91,55 @@ export async function POST(request: Request) {
   }
 
   try {
-    const registration = parsed.data;
-    const supabase = createSupabaseServiceRoleClient();
-    const { error } = await supabase.from("promoters").insert({
-      promotion_name: registration.promotionName,
-      license_number: registration.lastPromotionDate,
-      email: registration.promoterEmail,
-      contact_name: registration.contactName,
-      phone: governmentId.filename,
-      website_or_social: registration.websiteUrl,
-      status: "pending",
-      created_at: new Date().toISOString()
-    });
-
-    if (error) throw new Error(`Supabase promoter save failure: ${error.message}`);
+    const { password } = parsed.data;
+    const registration = {
+      promotionName: parsed.data.promotionName,
+      lastPromotionDate: parsed.data.lastPromotionDate,
+      promoterEmail: parsed.data.promoterEmail,
+      contactName: parsed.data.contactName,
+      websiteUrl: parsed.data.websiteUrl
+    };
+    await registerPromoterAccount(
+      {
+        ...registration,
+        governmentIdFileName: governmentId.filename
+      },
+      password,
+      new SupabasePromoterRegistrationGateway()
+    );
 
     await sendSupportPromoterRegistrationNotification({
-      ...registration,
+      promotionName: registration.promotionName,
+      lastPromotionDate: registration.lastPromotionDate,
+      promoterEmail: registration.promoterEmail,
+      contactName: registration.contactName,
+      websiteUrl: registration.websiteUrl,
       submittedAt: new Date(),
       governmentIdAttachment: governmentId
     });
     await sendPromoterPendingVerificationEmail(registration);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store, private" } }
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Promoter registration failed.";
+    const reasonCode =
+      error instanceof PromoterRegistrationOperationalError
+        ? error.reasonCode
+        : "PROMOTER_REGISTRATION_FAILED";
+    console.warn("Promoter account registration failed.", { reasonCode });
     await sendSupportErrorNotification({
-      errorType: message.startsWith("Supabase promoter save failure")
-        ? "Supabase Promoter Save Failure"
-        : "Promoter Registration Failure",
+      errorType: "Promoter Registration Failure",
       source: "app/api/promoter-registration POST",
-      message,
+      message: reasonCode,
       operation: "Complete promoter registration",
-      promoterName: body.contactName,
-      promotionName: body.promotionName,
       userShownOutcome: "failure"
     });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Promoter registration could not be completed at this time." },
+      { status: 500, headers: { "Cache-Control": "no-store, private" } }
+    );
   }
 }
 
@@ -175,9 +194,9 @@ async function sendPromoterPendingVerificationEmail(registration: PromoterRegist
       text: [
         "Thank you for registering your promotion with CAMO Help.",
         "",
-        "Your promoter verification request has been received and is pending review.",
+        "Your promoter account has been created and your registration is pending review.",
         "",
-        "Once approved, your promotion will become available for fighter selection within CAMO Help.",
+        "After approval, you can log in using the email and password you selected during registration.",
         "",
         "If additional information is needed, we will contact you using the email address provided during registration.",
         "",

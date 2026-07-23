@@ -18,6 +18,19 @@ export async function GET(request: NextRequest) {
 
     if (error) throw new Error(error.message);
 
+    const promoterIds = (data || []).map((promoter) => promoter.id);
+    const { data: accounts, error: accountsError } = promoterIds.length
+      ? await supabase
+          .from("promoter_accounts")
+          .select("promoter_id, link_status")
+          .in("promoter_id", promoterIds)
+      : { data: [], error: null };
+
+    if (accountsError) throw new Error(accountsError.message);
+    const accountStatusByPromoterId = new Map(
+      (accounts || []).map((account) => [account.promoter_id, account.link_status])
+    );
+
     return NextResponse.json({
       promoters: (data || []).map((promoter) => ({
         id: promoter.id,
@@ -28,6 +41,7 @@ export async function GET(request: NextRequest) {
         governmentIdFileName: promoter.phone,
         websiteUrl: promoter.website_or_social,
         status: promoter.status,
+        accountLinkStatus: accountStatusByPromoterId.get(promoter.id) || null,
         createdAt: promoter.created_at
       }))
     });

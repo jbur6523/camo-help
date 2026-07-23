@@ -265,8 +265,8 @@ export function ApplicationWizard() {
             <button className="button primary" type="button" onClick={() => setShowCamoProfileModal(true)}>
               Start Application
             </button>
-            <a className="button promoter-registration-button" href="/promoter-registration">
-              Promoter Registration
+            <a className="button promoter-registration-button" href="/promoters">
+              Promoter Login / Registration
             </a>
           </div>
           {showCamoProfileModal ? (
