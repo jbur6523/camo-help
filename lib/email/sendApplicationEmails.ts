@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { formatPacificDateTime, formatPacificLongDate } from "@/lib/dates";
 import { safeErrorMessage, sendSupportErrorNotification } from "@/lib/email/supportNotifications";
 import { independentPromoterId } from "@/lib/promoters/constants";
+import { logSuppressedOutboundEmail, outboundEmailEnabled } from "@/lib/security/outboundEmail";
 import type { ApplicationData } from "@/lib/types";
 import { fullName, requirementLabels, type UploadKey } from "@/lib/types";
 
@@ -68,6 +69,18 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
   }).length > 0;
   if (!hasSelectedAttachments) throw new NoSelectedEmailAttachmentsError();
 
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendApplicationEmails");
+    return {
+      applicationRecipient: null,
+      medicalRecipient: null,
+      fighterConfirmationRecipient: null,
+      resendMessageIds: {},
+      betaMode,
+      deliverySuppressed: true
+    };
+  }
+
   const resend = new Resend(requiredEnv("RESEND_API_KEY"));
   const from = requiredEnv("EMAIL_FROM");
   const applicationRecipient = requiredEnv("LICENSE_EMAIL_TO");
@@ -129,7 +142,8 @@ export async function sendApplicationEmails(payload: SubmissionEmailPayload) {
     medicalRecipient: messages.some((message) => message.kind === "medical") ? medicalRecipient : null,
     fighterConfirmationRecipient,
     resendMessageIds,
-    betaMode
+    betaMode,
+    deliverySuppressed: false
   };
 }
 
@@ -237,6 +251,10 @@ function delay(milliseconds: number) {
 export async function sendPromoterNotificationEmail(application: ApplicationData, submissionId: string, submittedAt = new Date()) {
   const selectedPromoterId = application.selectedPromoterId;
   if (!selectedPromoterId || selectedPromoterId === independentPromoterId) return null;
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterNotificationEmail");
+    return null;
+  }
 
   try {
     const apiKey = process.env.RESEND_API_KEY;

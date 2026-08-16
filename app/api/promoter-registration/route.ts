@@ -11,6 +11,7 @@ import {
 } from "@/lib/promoters/supabaseRegistrationGateway";
 import type { PromoterRegistration } from "@/lib/promoters/registrationSchema";
 import { turnstileErrorStatus, turnstileUserMessage, verifyTurnstileToken } from "@/lib/security/turnstile";
+import { logSuppressedOutboundEmail, outboundEmailEnabled } from "@/lib/security/outboundEmail";
 
 export const runtime = "nodejs";
 
@@ -171,6 +172,10 @@ function clientIpFromHeaders(headers: Headers) {
 }
 
 async function sendPromoterPendingVerificationEmail(registration: PromoterRegistration) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterPendingVerificationEmail");
+    return;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 

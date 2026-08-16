@@ -8,6 +8,7 @@ import {
 import { promoterApprovalEmailText } from "@/lib/promoters/approvalEmail";
 import { nextPromoterStatus, type PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { logSuppressedOutboundEmail, outboundEmailEnabled } from "@/lib/security/outboundEmail";
 import type { PromoterStatus } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
@@ -120,6 +121,10 @@ async function sendPromoterDenialEmail({
   promotionName: string;
   reason: string;
 }) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterDenialEmail");
+    return true;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
@@ -186,6 +191,10 @@ async function sendPromoterApprovalEmail({
   email: string;
   promotionName: string;
 }) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterApprovalEmail");
+    return true;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 

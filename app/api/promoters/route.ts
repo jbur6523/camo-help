@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -16,12 +17,15 @@ export async function GET() {
       throw new Error(error.message);
     }
 
-    return NextResponse.json({
-      promoters: (data || []).map((promoter) => ({
-        id: promoter.id,
-        promotionName: promoter.promotion_name
-      }))
-    });
+    return NextResponse.json(
+      {
+        promoters: (data || []).map((promoter) => ({
+          id: promoter.id,
+          promotionName: promoter.promotion_name
+        }))
+      },
+      { headers: { "Cache-Control": "no-store, private" } }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load approved promoters.";
     return NextResponse.json({ error: message }, { status: 500 });
