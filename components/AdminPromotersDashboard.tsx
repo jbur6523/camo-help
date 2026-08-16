@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { formatPacificDateTime } from "@/lib/dates";
 import type { PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import type {
@@ -46,9 +47,9 @@ export function AdminPromotersDashboard() {
   return (
     <main className="app-shell">
       <section className="wizard-body admin-page">
-        <a className="button ghost" href="/">
+        <Link className="button ghost" href="/">
           Back to application
-        </a>
+        </Link>
         <h1 className="step-title">Promoter Approvals</h1>
         <p className="step-help">Review promoter registrations and control which promotions appear for fighters.</p>
         {message ? (
