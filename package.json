@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:promoter-auth": "tsx --test tests/promoter-auth.test.ts",
+    "verify:bestie": "tsx scripts/verify-bestie-target.ts",
     "inspect:pdfs": "tsx scripts/inspect-pdf-fields.ts",
     "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },
