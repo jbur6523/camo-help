@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "test:promoter-auth": "tsx --test tests/promoter-auth.test.ts",
+    "verify:bestie": "tsx scripts/verify-bestie-target.ts",
     "inspect:pdfs": "tsx scripts/inspect-pdf-fields.ts",
     "check:mobile-layout": "tsx scripts/check-mobile-layout.ts"
   },
@@ -15,7 +18,7 @@
     "@hookform/resolvers": "^3.10.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.107.0",
-    "next": "^14.2.30",
+    "next": "^15.5.21",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -29,8 +32,13 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.30",
+    "eslint-config-next": "^15.5.21",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "nanoid": "3.3.18",
+    "postcss": "8.5.24",
+    "sharp": "0.35.0"
   }
 }

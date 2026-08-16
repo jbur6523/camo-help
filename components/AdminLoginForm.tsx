@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export function AdminLoginForm() {
   const [password, setPassword] = useState("");
@@ -10,9 +11,9 @@ export function AdminLoginForm() {
   return (
     <main className="app-shell">
       <section className="wizard-body registration-page">
-        <a className="button ghost" href="/">
+        <Link className="button ghost" href="/">
           Back to application
-        </a>
+        </Link>
         <h1 className="step-title">Admin Login</h1>
         <p className="step-help">Enter the admin password to manage promoter approvals.</p>
         <form className="field-grid" onSubmit={handleSubmit}>

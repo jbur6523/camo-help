@@ -8,11 +8,12 @@ import {
 import { promoterApprovalEmailText } from "@/lib/promoters/approvalEmail";
 import { nextPromoterStatus, type PromoterAdminAction } from "@/lib/promoters/statusTransitions";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { logSuppressedOutboundEmail, outboundEmailEnabled } from "@/lib/security/outboundEmail";
 import type { PromoterStatus } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAdminRequestAuthenticated(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -33,13 +34,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Denial reason is required." }, { status: 400 });
   }
 
+  const { id } = await params;
   let promoterForError: { email: string; promotion_name: string; contact_name: string } | null = null;
   try {
     const supabase = createSupabaseServiceRoleClient();
     const { data: promoter, error: fetchError } = await supabase
       .from("promoters")
       .select("id, status, email, promotion_name, contact_name")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle();
 
     if (fetchError) throw new Error(`Supabase promoter fetch failure: ${fetchError.message}`);
@@ -56,7 +58,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .update({
         status: nextStatus
       })
-      .eq("id", params.id);
+      .eq("id", id);
 
     if (updateError) throw new Error(`Supabase promoter status update failure: ${updateError.message}`);
 
@@ -120,6 +122,10 @@ async function sendPromoterDenialEmail({
   promotionName: string;
   reason: string;
 }) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterDenialEmail");
+    return true;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
@@ -186,6 +192,10 @@ async function sendPromoterApprovalEmail({
   email: string;
   promotionName: string;
 }) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail("sendPromoterApprovalEmail");
+    return true;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 

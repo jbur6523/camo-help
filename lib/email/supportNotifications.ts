@@ -3,6 +3,7 @@ import { formatPacificDateTime } from "@/lib/dates";
 import { independentPromoterId } from "@/lib/promoters/constants";
 import type { ApplicationData, UploadKey } from "@/lib/types";
 import { fullName, requirementLabels } from "@/lib/types";
+import { logSuppressedOutboundEmail, outboundEmailEnabled } from "@/lib/security/outboundEmail";
 
 type SupportNotification = {
   subject: string;
@@ -68,6 +69,10 @@ type FighterSubmissionSupportPayload = {
 const adminPromotersUrl = "https://camo-help.com/admin/promoters";
 
 export async function sendSupportNotification({ subject, text, html, source, submissionId, attachments }: SupportNotification) {
+  if (!outboundEmailEnabled()) {
+    logSuppressedOutboundEmail(source);
+    return null;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const to = process.env.SUPPORT_EMAIL_TO;

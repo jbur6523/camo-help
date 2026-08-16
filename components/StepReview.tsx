@@ -214,7 +214,7 @@ export function StepReview({
               </label>
               <label className="checkbox-line">
                 <input type="checkbox" {...register("certifyHelperOnly", { required: "Certification is required." })} />I understand
-                this app helps prepare and send documents but does not replace CAMO's official review or approval process.
+                this app helps prepare and send documents but does not replace CAMO&apos;s official review or approval process.
               </label>
               <label className="checkbox-line">
                 <input type="checkbox" {...register("certifyPaymentSeparate", { required: "Certification is required." })} />I understand

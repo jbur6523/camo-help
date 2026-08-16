@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Field, TextArea, YesNoChoice } from "@/components/FormBits";
 import type { ApplicationData, FightEvent, YesNo } from "@/lib/types";
@@ -9,7 +9,8 @@ const blankFight: FightEvent = { promoter: "", state: "", opponent: "", outcome:
 
 export function StepFighterHistory({ form }: { form: UseFormReturn<ApplicationData> }) {
   const { register, watch, setValue, clearErrors, formState } = form;
-  const fights = watch("fights") || [];
+  const watchedFights = watch("fights");
+  const fights = useMemo(() => watchedFights || [], [watchedFights]);
   const recordTotal =
     Number(watch("recordWins") || 0) +
     Number(watch("recordLosses") || 0) +

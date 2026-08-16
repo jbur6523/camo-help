@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "bestieAppId": "c3e0b89f-8cf8-4ddd-8a5b-5d44f0927c7b",
+  "migrationDirectory": "supabase/migrations",
+  "migrationEngine": "postgresql-sql",
+  "expectedBranch": "migration/bestie-cloud-phase-5a",
+  "frontendUrl": null,
+  "vercelProject": "camo-help-bestie-preview",
+  "automaticDelivery": {
+    "backwardCompatibleMigrations": false
+  },
+  "publicEnvironment": {
+    "apiUrl": "NEXT_PUBLIC_SUPABASE_URL",
+    "publishableKey": "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  },
+  "healthChecks": {
+    "rest": true,
+    "auth": true
+  }
+}

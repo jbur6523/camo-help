@@ -193,6 +193,7 @@ test("passwords and tokens are absent from persistence, database schema, account
 
 test("private mapping RLS, uniqueness, legacy confirmation, and public-directory field limits are explicit", () => {
   const migration = source("supabase/migrations/202607220001_promoter_auth_foundation.sql");
+  const hardeningMigration = source("supabase/migrations/202608160000_harden_public_promoter_access.sql");
   const directory = source("app/api/promoters/route.ts");
   const dashboardResolver = source("lib/promoters/currentPromoter.ts");
 
@@ -203,6 +204,9 @@ test("private mapping RLS, uniqueness, legacy confirmation, and public-directory
   assert.match(migration, /auth\.uid\(\) = auth_user_id/i);
   assert.match(migration, /pending_admin_confirmation/i);
   assert.match(migration, /revoke all [\s\S]* from anon/i);
+  assert.match(hardeningMigration, /drop policy if exists "Promoter registrations can be created as pending"/i);
+  assert.match(hardeningMigration, /revoke insert, update, delete[\s\S]*from anon, authenticated/i);
+  assert.match(hardeningMigration, /grant select on public\.promoters to anon, authenticated/i);
   assert.match(directory, /\.select\("id, promotion_name"\)/);
   assert.doesNotMatch(directory, /auth_user_id|promoter_accounts/);
   assert.match(dashboardResolver, /\.eq\("auth_user_id", authData\.user\.id\)/);
